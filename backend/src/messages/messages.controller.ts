@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   Param,
   ParseFilePipeBuilder,
@@ -18,6 +19,24 @@ export class MessagesController {
   constructor(
     private readonly messagesService: MessagesService,
   ) {}
+
+  @Get(':workspaceSlug/conversations/:conversationId/messages')
+  async getVisitorMessages(
+    @Param('workspaceSlug')
+    workspaceSlug: string,
+
+    @Param('conversationId')
+    conversationId: string,
+
+    @Headers('authorization')
+    authorization: string | undefined,
+  ) {
+    return this.messagesService.getVisitorMessages(
+      workspaceSlug,
+      conversationId,
+      authorization,
+    );
+  }
 
   @Post(':workspaceSlug/conversations/:conversationId/messages')
   async createVisitorMessage(

@@ -1,0 +1,44 @@
+.nova-message--visitor {
+  align-self: flex-end;
+
+  background: #111827;
+  color: #ffffff;
+}
+
+.nova-message--agent {
+  align-self: flex-start;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+}
+
+.nova-message--error {
+  align-self: center;
+
+  max-width: 100%;
+
+  background: #fee2e2;
+  color: #991b1b;
+
+  font-size: 12px;
+}
+
+.nova-message__image {
+  display: block;
+
+  max-width: 100%;
+  max-height: 250px;
+
+  margin-bottom: 6px;
+
+  border-radius: 8px;
+
+  object-fit: cover;
+}
+
+.nova-chat__composer button:disabled,
+.nova-chat__composer input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1,0 +1,151 @@
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.nova-widget-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.nova-chat {
+  width: 100%;
+  max-width: 380px;
+  height: 600px;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 18px 50px
+    rgba(0, 0, 0, 0.12);
+}
+
+.nova-chat__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  padding: 18px 20px;
+
+  background: #111827;
+  color: white;
+}
+
+.nova-chat__header h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.nova-chat__header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.nova-chat__status {
+  font-size: 12px;
+
+  padding: 5px 9px;
+
+  background: rgba(
+    255,
+    255,
+    255,
+    0.12
+  );
+
+  border-radius: 999px;
+}
+
+.nova-chat__messages {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  padding: 18px;
+
+  overflow-y: auto;
+
+  background: #f9fafb;
+}
+
+.nova-message {
+  max-width: 80%;
+
+  padding: 10px 12px;
+
+  border-radius: 12px;
+
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.nova-message--system {
+  align-self: flex-start;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+}
+
+.nova-chat__composer {
+  display: flex;
+  gap: 8px;
+
+  padding: 14px;
+
+  border-top: 1px solid #e5e7eb;
+
+  background: #ffffff;
+}
+
+.nova-chat__composer input {
+  flex: 1;
+
+  min-width: 0;
+
+  padding: 10px 12px;
+
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+
+  outline: none;
+
+  font: inherit;
+}
+
+.nova-chat__composer input:focus {
+  border-color: #111827;
+}
+
+.nova-chat__composer button {
+  border: 0;
+  border-radius: 10px;
+
+  padding: 10px 14px;
+
+  background: #111827;
+  color: white;
+
+  cursor: pointer;
+
+  font: inherit;
+}
+
+.nova-chat__composer button:hover {
+  background: #1f2937;
+}

@@ -20,7 +20,75 @@ export class MessagesService {
     private readonly realtimeService: RealtimeService,
     private readonly visitorsService: VisitorsService,
   ) {}
+  async getVisitorMessages(
+    workspaceSlug: string,
+    conversationId: string,
+    visitorToken: string | undefined,
+  ) {
+    const workspace =
+      await this.prisma.workspace.findUnique({
+        where: {
+          slug: workspaceSlug
+            .trim()
+            .toLowerCase(),
+        },
+      });
 
+    if (!workspace) {
+      throw new NotFoundException(
+        'Workspace no encontrado',
+      );
+    }
+
+    if (workspace.status !== 'ACTIVE') {
+      throw new UnauthorizedException(
+        'El workspace está inactivo',
+      );
+    }
+
+    const visitor =
+      await this.visitorsService
+        .verifyVisitorToken(
+          visitorToken,
+          workspace.id,
+        );
+
+    const conversation =
+      await this.prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          workspaceId: workspace.id,
+          visitorId: visitor.id,
+        },
+      });
+
+    if (!conversation) {
+      throw new NotFoundException(
+        'Conversación no encontrada',
+      );
+    }
+
+    await this.prisma.visitor.update({
+      where: {
+        id: visitor.id,
+      },
+
+      data: {
+        lastSeenAt: new Date(),
+      },
+    });
+
+    return this.prisma.message.findMany({
+      where: {
+        conversationId:
+          conversation.id,
+      },
+
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
   async createVisitorMessage(
     workspaceSlug: string,
     conversationId: string,
