@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guards';
 import { WorkspaceGuard } from '../auth/guards/workspace.guards';
 import { Roles } from '../auth/decorators/roles.decorators';
+import { PasswordChangedGuard } from '../auth/guards/password.guards';
 
 @Controller('workspaces')
 export class UsersController {
@@ -24,6 +25,7 @@ export class UsersController {
   @Post(':workspaceId/owners')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
   )
   @Roles('PLATFORM_ADMIN')
@@ -40,6 +42,7 @@ export class UsersController {
   @Post(':workspaceId/temporary-owners')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
   )
   @Roles('PLATFORM_ADMIN')
@@ -58,6 +61,7 @@ export class UsersController {
   @Post(':workspaceId/admins')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )
@@ -77,6 +81,7 @@ export class UsersController {
   @Post(':workspaceId/agents')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )
@@ -94,6 +99,7 @@ export class UsersController {
   @Get(':workspaceId/users')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )
@@ -113,6 +119,7 @@ export class UsersController {
   @Get(':workspaceId/users/:userId')
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )
@@ -136,6 +143,7 @@ export class UsersController {
   )
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )
@@ -161,6 +169,7 @@ export class UsersController {
   )
   @UseGuards(
     JwtAuthGuard,
+    PasswordChangedGuard,
     RolesGuard,
     WorkspaceGuard,
   )

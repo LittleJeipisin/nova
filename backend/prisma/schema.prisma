@@ -1,4 +1,5 @@
 // Prisma schema for Nova
+
 generator client {
   provider     = "prisma-client"
   output       = "../generated/prisma"
@@ -26,6 +27,22 @@ enum OwnerType {
   TEMPORARY
 }
 
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+}
+
+enum MessageSenderType {
+  VISITOR
+  USER
+}
+
 model Workspace {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -34,7 +51,9 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users User[]
+  users         User[]
+  visitors      Visitor[]
+  conversations Conversation[]
 }
 
 model User {
@@ -51,10 +70,82 @@ model User {
   workspaceId String?    @db.Uuid
   workspace   Workspace? @relation(fields: [workspaceId], references: [id])
 
+  assignedConversations Conversation[] @relation("AssignedAgent")
+  sentMessages          Message[]      @relation("UserMessages")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([workspaceId, username])
   @@index([workspaceId])
   @@index([workspaceId, role])
+}
+
+model Visitor {
+  id String @id @default(uuid()) @db.Uuid
+
+  workspaceId String    @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  conversations Conversation[]
+  sentMessages  Message[]      @relation("VisitorMessages")
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+
+  @@index([workspaceId])
+}
+
+model Conversation {
+  id String @id @default(uuid()) @db.Uuid
+
+  status ConversationStatus @default(OPEN)
+
+  workspaceId String    @db.Uuid
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  visitorId String  @db.Uuid
+  visitor   Visitor @relation(fields: [visitorId], references: [id])
+
+  assignedAgentId String? @db.Uuid
+  assignedAgent   User?   @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+
+  messages Message[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  @@index([workspaceId])
+  @@index([visitorId])
+  @@index([assignedAgentId])
+  @@index([workspaceId, status])
+}
+
+model Message {
+  id String @id @default(uuid()) @db.Uuid
+
+  conversationId String       @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderType MessageSenderType
+
+  senderUserId String? @db.Uuid
+  senderUser   User?   @relation("UserMessages", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  senderVisitorId String?  @db.Uuid
+  senderVisitor   Visitor? @relation("VisitorMessages", fields: [senderVisitorId], references: [id], onDelete: SetNull)
+
+  type MessageType @default(TEXT)
+
+  content  String?
+  mediaUrl String?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([senderUserId])
+  @@index([senderVisitorId])
+  @@index([conversationId, createdAt])
 }

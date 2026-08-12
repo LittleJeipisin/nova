@@ -31,6 +31,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: {
         id: payload.sub,
       },
+      include: {
+        workspace: true,
+      },
     });
 
     if (!user) {
@@ -43,6 +46,22 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException(
         'Usuario inactivo',
       );
+    }
+
+    // Todos los usuarios de una empresa necesitan
+    // pertenecer a un Workspace activo.
+    if (user.role !== 'PLATFORM_ADMIN') {
+      if (!user.workspace) {
+        throw new UnauthorizedException(
+          'El usuario no tiene un workspace asociado',
+        );
+      }
+
+      if (user.workspace.status !== 'ACTIVE') {
+        throw new UnauthorizedException(
+          'El workspace está inactivo',
+        );
+      }
     }
 
     if (
@@ -68,6 +87,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       ownerType: user.ownerType,
       workspaceId: user.workspaceId,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 }
