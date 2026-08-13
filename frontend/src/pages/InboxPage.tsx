@@ -15,6 +15,7 @@ import {
 import type { AuthUser } from '../auth/auth';
 
 import {
+  claimConversation,
   getConversation,
   getConversations,
 } from '../lib/api';
@@ -33,6 +34,12 @@ import type {
 type InboxPageProps = {
   user: AuthUser;
   onLogout: () => void;
+};
+
+type InboxNotification = {
+  type: 'success' | 'warning';
+  title: string;
+  message: string;
 };
 
 function sortConversations(
@@ -56,47 +63,70 @@ function sortMessages(
 }
 
 function formatTime(value: string) {
-  return new Intl.DateTimeFormat('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat(
+    'es-CL',
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    },
+  ).format(
+    new Date(value),
+  );
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat('es-CL', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(value));
+function formatDateTime(
+  value: string,
+) {
+  return new Intl.DateTimeFormat(
+    'es-CL',
+    {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    },
+  ).format(
+    new Date(value),
+  );
 }
 
 function getLastMessage(
   conversation: ConversationSummary,
 ) {
-  const message = conversation.messages[0];
+  const message =
+    conversation.messages[0];
 
   if (!message) {
     return 'Sin mensajes';
   }
 
-  if (message.type === 'IMAGE') {
+  if (
+    message.type ===
+    'IMAGE'
+  ) {
     return message.content
       ? `📷 ${message.content}`
       : '📷 Imagen';
   }
 
-  return message.content ?? 'Mensaje';
+  return (
+    message.content ??
+    'Mensaje'
+  );
 }
 
 function AppStatus({
   status,
 }: {
-  status: ConversationSummary['status'];
+  status:
+    ConversationSummary['status'];
 }) {
-  if (status === 'OPEN') {
+  if (
+    status ===
+    'OPEN'
+  ) {
     return (
       <span className="nova-inbox__status nova-inbox__status--open">
         Abierta
@@ -104,7 +134,10 @@ function AppStatus({
     );
   }
 
-  if (status === 'PENDING') {
+  if (
+    status ===
+    'PENDING'
+  ) {
     return (
       <span className="nova-inbox__status nova-inbox__status--pending">
         Pendiente
@@ -129,50 +162,206 @@ export function InboxPage({
   const [
     conversations,
     setConversations,
-  ] = useState<ConversationSummary[]>([]);
+  ] =
+    useState<
+      ConversationSummary[]
+    >([]);
 
   const [
     selectedConversationId,
     setSelectedConversationId,
-  ] = useState<string | null>(null);
+  ] =
+    useState<
+      string | null
+    >(null);
 
   const [
     activeConversation,
     setActiveConversation,
   ] =
-    useState<ConversationDetail | null>(
-      null,
-    );
+    useState<
+      ConversationDetail | null
+    >(null);
 
   const [
     loadingConversations,
     setLoadingConversations,
-  ] = useState(true);
+  ] =
+    useState(true);
 
   const [
     loadingConversation,
     setLoadingConversation,
-  ] = useState(false);
+  ] =
+    useState(false);
+
+  const [
+    claimingConversationId,
+    setClaimingConversationId,
+  ] =
+    useState<
+      string | null
+    >(null);
 
   const [
     socketStatus,
     setSocketStatus,
-  ] = useState('Conectando...');
+  ] =
+    useState(
+      'Conectando...',
+    );
 
   const [
     error,
     setError,
-  ] = useState<string | null>(null);
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    notification,
+    setNotification,
+  ] =
+    useState<
+      InboxNotification | null
+    >(null);
 
   const socketRef =
-    useRef<Socket | null>(null);
+    useRef<
+      Socket | null
+    >(null);
 
   const selectedConversationIdRef =
-    useRef<string | null>(null);
+    useRef<
+      string | null
+    >(null);
 
-  const messagesEndRef =
-    useRef<HTMLDivElement | null>(
-      null,
+  const conversationsRef =
+    useRef<
+      ConversationSummary[]
+    >([]);
+
+  /*
+   * Mientras estamos tomando una
+   * conversación, el backend enviará
+   * conversation:removed al room
+   * "unassigned".
+   *
+   * Debemos ignorar exactamente ese
+   * remove en el agente que la tomó.
+   */
+  const claimingConversationIdRef =
+    useRef<
+      string | null
+    >(null);
+
+  /*
+   * Protección de respaldo:
+   * si por alguna razón el evento
+   * conversation:removed no llega,
+   * no dejamos la protección activa
+   * indefinidamente.
+   */
+  const claimProtectionTimeoutRef =
+    useRef<
+      number | null
+    >(null);
+
+  const notificationTimeoutRef =
+    useRef<
+      number | null
+    >(null);
+
+  const messagesContainerRef =
+    useRef<
+      HTMLDivElement | null
+    >(null);
+
+  useEffect(
+    () => {
+      conversationsRef.current =
+        conversations;
+    },
+    [
+      conversations,
+    ],
+  );
+
+  const showNotification =
+    useCallback(
+      (
+        nextNotification:
+          InboxNotification,
+      ) => {
+        if (
+          notificationTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            notificationTimeoutRef
+              .current,
+          );
+        }
+
+        setNotification(
+          nextNotification,
+        );
+
+        notificationTimeoutRef.current =
+          window.setTimeout(
+            () => {
+              setNotification(
+                null,
+              );
+
+              notificationTimeoutRef.current =
+                null;
+            },
+            4000,
+          );
+      },
+      [],
+    );
+
+  const clearClaimProtection =
+    useCallback(
+      (
+        conversationId?:
+          string,
+      ) => {
+        if (
+          conversationId &&
+          claimingConversationIdRef
+            .current !==
+            conversationId
+        ) {
+          return;
+        }
+
+        claimingConversationIdRef.current =
+          null;
+
+        setClaimingConversationId(
+          null,
+        );
+
+        if (
+          claimProtectionTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            claimProtectionTimeoutRef
+              .current,
+          );
+
+          claimProtectionTimeoutRef.current =
+            null;
+        }
+      },
+      [],
     );
 
   const upsertConversation =
@@ -187,7 +376,9 @@ export function InboxPage({
           ) => {
             const withoutCurrent =
               currentConversations.filter(
-                (current) =>
+                (
+                  current,
+                ) =>
                   current.id !==
                   conversation.id,
               );
@@ -200,7 +391,9 @@ export function InboxPage({
         );
 
         setActiveConversation(
-          (current) => {
+          (
+            current,
+          ) => {
             if (
               !current ||
               current.id !==
@@ -211,14 +404,19 @@ export function InboxPage({
 
             return {
               ...current,
+
               status:
                 conversation.status,
+
               assignedAgentId:
                 conversation.assignedAgentId,
+
               assignedAgent:
                 conversation.assignedAgent,
+
               updatedAt:
                 conversation.updatedAt,
+
               closedAt:
                 conversation.closedAt,
             };
@@ -231,21 +429,25 @@ export function InboxPage({
   const removeConversation =
     useCallback(
       (
-        conversationId: string,
+        conversationId:
+          string,
       ) => {
         setConversations(
           (
             currentConversations,
           ) =>
             currentConversations.filter(
-              (conversation) =>
+              (
+                conversation,
+              ) =>
                 conversation.id !==
                 conversationId,
             ),
         );
 
         if (
-          selectedConversationIdRef.current ===
+          selectedConversationIdRef
+            .current ===
           conversationId
         ) {
           selectedConversationIdRef.current =
@@ -265,9 +467,14 @@ export function InboxPage({
 
   const addMessage =
     useCallback(
-      (message: ChatMessage) => {
+      (
+        message:
+          ChatMessage,
+      ) => {
         setActiveConversation(
-          (current) => {
+          (
+            current,
+          ) => {
             if (
               !current ||
               current.id !==
@@ -285,12 +492,15 @@ export function InboxPage({
                   message.id,
               );
 
-            if (alreadyExists) {
+            if (
+              alreadyExists
+            ) {
               return current;
             }
 
             return {
               ...current,
+
               messages:
                 sortMessages([
                   ...current.messages,
@@ -306,7 +516,8 @@ export function InboxPage({
   const loadConversation =
     useCallback(
       async (
-        conversationId: string,
+        conversationId:
+          string,
       ) => {
         if (!workspaceId) {
           return;
@@ -316,7 +527,9 @@ export function InboxPage({
           getStoredAccessToken() ??
           '';
 
-        if (!accessToken) {
+        if (
+          !accessToken
+        ) {
           onLogout();
 
           return;
@@ -327,7 +540,9 @@ export function InboxPage({
             true,
           );
 
-          setError(null);
+          setError(
+            null,
+          );
 
           selectedConversationIdRef.current =
             conversationId;
@@ -343,6 +558,14 @@ export function InboxPage({
               conversationId,
             );
 
+          /*
+           * Podría ocurrir que mientras
+           * cargábamos el detalle otro
+           * agente tomara el chat.
+           *
+           * El backend es la autoridad y
+           * rechazará el acceso en ese caso.
+           */
           setActiveConversation(
             conversation,
           );
@@ -357,11 +580,16 @@ export function InboxPage({
               conversationId,
             );
           }
-        } catch (err) {
-          console.error(err);
+        } catch (
+          err
+        ) {
+          console.error(
+            err,
+          );
 
           setError(
-            err instanceof Error
+            err instanceof
+              Error
               ? err.message
               : 'No se pudo cargar la conversación',
           );
@@ -377,16 +605,19 @@ export function InboxPage({
       ],
     );
 
-  useEffect(() => {
+  async function handleClaimConversation() {
     if (
-      user.role !== 'AGENT' ||
-      !workspaceId
+      !activeConversation ||
+      activeConversation
+        .assignedAgentId ||
+      claimingConversationId
     ) {
       return;
     }
 
     const accessToken =
-      getStoredAccessToken() ?? '';
+      getStoredAccessToken() ??
+      '';
 
     if (!accessToken) {
       onLogout();
@@ -394,151 +625,495 @@ export function InboxPage({
       return;
     }
 
-    let cancelled = false;
+    const conversationId =
+      activeConversation.id;
 
-    const socket =
-      connectAgentSocket(
-        accessToken,
-        workspaceId,
-        {
-          onWorkspaceJoined() {
-            setSocketStatus(
-              'En línea',
-            );
+    /*
+     * Activamos la protección ANTES
+     * del PATCH porque el evento socket
+     * puede llegar antes de que termine
+     * la respuesta HTTP.
+     */
+    claimingConversationIdRef.current =
+      conversationId;
 
-            const conversationId =
-              selectedConversationIdRef.current;
+    setClaimingConversationId(
+      conversationId,
+    );
 
-            const currentSocket =
-              socketRef.current;
+    if (
+      claimProtectionTimeoutRef
+        .current !==
+      null
+    ) {
+      window.clearTimeout(
+        claimProtectionTimeoutRef
+          .current,
+      );
+    }
 
-            if (
-              conversationId &&
-              currentSocket
-            ) {
-              joinAgentConversation(
-                currentSocket,
-                workspaceId,
-                conversationId,
-              );
-            }
-          },
-
-          onConversationJoined() {
-            setSocketStatus(
-              'En línea',
-            );
-          },
-
-          onMessage(message) {
-            addMessage(
-              message,
-            );
-          },
-
-          onConversationUpdated(
-            conversation,
-          ) {
-            upsertConversation(
-              conversation,
-            );
-          },
-
-          onConversationRemoved(
+    claimProtectionTimeoutRef.current =
+      window.setTimeout(
+        () => {
+          clearClaimProtection(
             conversationId,
+          );
+        },
+        5000,
+      );
+
+    try {
+      setError(
+        null,
+      );
+
+      const claimedConversation =
+        await claimConversation(
+          accessToken,
+          workspaceId,
+          conversationId,
+        );
+
+      /*
+       * Aplicamos inmediatamente la
+       * respuesta REST.
+       *
+       * No esperamos al Socket para que
+       * la interfaz responda al instante.
+       */
+      upsertConversation(
+        claimedConversation,
+      );
+
+      setActiveConversation(
+        (
+          current,
+        ) => {
+          if (
+            !current ||
+            current.id !==
+              conversationId
           ) {
-            removeConversation(
-              conversationId,
-            );
-          },
+            return current;
+          }
 
-          onDisconnect() {
-            setSocketStatus(
-              'Desconectado',
-            );
-          },
+          return {
+            ...current,
 
-          onError(message) {
-            setError(
-              message,
-            );
-          },
+            status:
+              claimedConversation.status,
+
+            assignedAgentId:
+              claimedConversation
+                .assignedAgentId,
+
+            assignedAgent:
+              claimedConversation
+                .assignedAgent,
+
+            updatedAt:
+              claimedConversation
+                .updatedAt,
+
+            closedAt:
+              claimedConversation
+                .closedAt,
+          };
         },
       );
 
-    socketRef.current = socket;
+      showNotification({
+        type: 'success',
+        title:
+          'Conversación tomada',
+        message:
+          'La conversación ahora está asignada a ti.',
+      });
 
-    async function loadInbox() {
-      try {
-        setLoadingConversations(
-          true,
+      /*
+       * NO limpiamos todavía
+       * claimingConversationIdRef.
+       *
+       * conversation:removed puede
+       * llegar justo después de la
+       * respuesta HTTP.
+       *
+       * El handler del Socket consumirá
+       * ese evento y limpiará la
+       * protección.
+       */
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
+
+      clearClaimProtection(
+        conversationId,
+      );
+
+      const claimErrorMessage =
+        err instanceof
+          Error
+          ? err.message
+          : 'No se pudo tomar la conversación';
+
+      const takenByAnotherAgent =
+        claimErrorMessage
+          .toLowerCase()
+          .includes(
+            'tomada por otro agente',
+          );
+
+      if (
+        takenByAnotherAgent
+      ) {
+        showNotification({
+          type: 'warning',
+          title:
+            'No se pudo tomar la conversación',
+          message:
+            'Otro agente la tomó antes que tú.',
+        });
+      } else {
+        setError(
+          claimErrorMessage,
         );
+      }
 
-        setError(null);
-
-        const result =
+      /*
+       * Si otro agente ganó la carrera,
+       * sincronizamos nuevamente la
+       * bandeja para retirar el chat.
+       */
+      try {
+        const latestConversations =
           await getConversations(
             accessToken,
             workspaceId,
           );
 
-        if (cancelled) {
-          return;
-        }
+        const conversationStillVisible =
+          latestConversations.some(
+            (
+              conversation,
+            ) =>
+              conversation.id ===
+              conversationId,
+          );
 
         setConversations(
           sortConversations(
-            result,
+            latestConversations,
           ),
         );
-      } catch (err) {
-        console.error(err);
 
-        if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'No se pudieron cargar las conversaciones',
+        if (
+          !conversationStillVisible
+        ) {
+          removeConversation(
+            conversationId,
           );
         }
-      } finally {
-        if (!cancelled) {
-          setLoadingConversations(
-            false,
-          );
-        }
+      } catch (
+        syncError
+      ) {
+        console.error(
+          'No se pudo resincronizar la bandeja:',
+          syncError,
+        );
       }
     }
+  }
 
-    void loadInbox();
+  useEffect(
+    () => {
+      if (
+        user.role !==
+          'AGENT' ||
+        !workspaceId
+      ) {
+        return;
+      }
 
-    return () => {
-      cancelled = true;
+      const accessToken =
+        getStoredAccessToken() ??
+        '';
 
-      socket.disconnect();
+      if (
+        !accessToken
+      ) {
+        onLogout();
 
-      socketRef.current = null;
-    };
-  }, [
-    addMessage,
-    onLogout,
-    removeConversation,
-    upsertConversation,
-    user.role,
-    workspaceId,
-  ]);
+        return;
+      }
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView(
-      {
-        behavior: 'smooth',
-      },
-    );
-  }, [
-    activeConversation?.messages,
-  ]);
+      let cancelled =
+        false;
 
-  if (user.role !== 'AGENT') {
+      const socket =
+        connectAgentSocket(
+          accessToken,
+          workspaceId,
+          {
+            onWorkspaceJoined() {
+              setSocketStatus(
+                'En línea',
+              );
+
+              const conversationId =
+                selectedConversationIdRef
+                  .current;
+
+              const currentSocket =
+                socketRef.current;
+
+              if (
+                conversationId &&
+                currentSocket
+              ) {
+                joinAgentConversation(
+                  currentSocket,
+                  workspaceId,
+                  conversationId,
+                );
+              }
+            },
+
+            onConversationJoined() {
+              setSocketStatus(
+                'En línea',
+              );
+            },
+
+            onMessage(
+              message,
+            ) {
+              addMessage(
+                message,
+              );
+            },
+
+            onConversationUpdated(
+              conversation,
+            ) {
+              upsertConversation(
+                conversation,
+              );
+            },
+
+            onConversationRemoved(
+              conversationId,
+            ) {
+              /*
+               * Si este remove pertenece
+               * exactamente al claim que
+               * nosotros estamos haciendo,
+               * NO quitamos el chat.
+               *
+               * El backend también nos
+               * envía conversation:updated
+               * por user:{agentId}.
+               */
+              if (
+                claimingConversationIdRef
+                  .current ===
+                conversationId
+              ) {
+                clearClaimProtection(
+                  conversationId,
+                );
+
+                return;
+              }
+
+              const removedConversation =
+                conversationsRef.current.find(
+                  (
+                    conversation,
+                  ) =>
+                    conversation.id ===
+                    conversationId,
+                );
+
+              if (
+                removedConversation
+                  ?.assignedAgentId ===
+                null
+              ) {
+                showNotification({
+                  type: 'warning',
+                  title:
+                    'Conversación tomada',
+                  message:
+                    'Otro agente tomó esta conversación.',
+                });
+              }
+
+              /*
+               * Cualquier otro remove sí
+               * es legítimo.
+               *
+               * Ejemplo:
+               * un ADMIN reasignó una
+               * conversación nuestra a
+               * otro agente.
+               */
+              removeConversation(
+                conversationId,
+              );
+            },
+
+            onDisconnect() {
+              setSocketStatus(
+                'Desconectado',
+              );
+            },
+
+            onError(
+              message,
+            ) {
+              setError(
+                message,
+              );
+            },
+          },
+        );
+
+      socketRef.current =
+        socket;
+
+      async function loadInbox() {
+        try {
+          setLoadingConversations(
+            true,
+          );
+
+          setError(
+            null,
+          );
+
+          const result =
+            await getConversations(
+              accessToken,
+              workspaceId,
+            );
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setConversations(
+            sortConversations(
+              result,
+            ),
+          );
+        } catch (
+          err
+        ) {
+          console.error(
+            err,
+          );
+
+          if (
+            !cancelled
+          ) {
+            setError(
+              err instanceof
+                Error
+                ? err.message
+                : 'No se pudieron cargar las conversaciones',
+            );
+          }
+        } finally {
+          if (
+            !cancelled
+          ) {
+            setLoadingConversations(
+              false,
+            );
+          }
+        }
+      }
+
+      void loadInbox();
+
+      return () => {
+        cancelled =
+          true;
+
+        socket.disconnect();
+
+        socketRef.current =
+          null;
+      };
+    },
+    [
+      addMessage,
+      clearClaimProtection,
+      onLogout,
+      removeConversation,
+      showNotification,
+      upsertConversation,
+      user.role,
+      workspaceId,
+    ],
+  );
+
+  useEffect(
+    () => {
+      return () => {
+        if (
+          claimProtectionTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            claimProtectionTimeoutRef
+              .current,
+          );
+        }
+
+        if (
+          notificationTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            notificationTimeoutRef
+              .current,
+          );
+        }
+      };
+    },
+    [],
+  );
+
+  useEffect(
+    () => {
+      const container =
+        messagesContainerRef.current;
+
+      if (!container) {
+        return;
+      }
+
+      container.scrollTop =
+        container.scrollHeight;
+    },
+    [
+      activeConversation
+        ?.messages,
+    ],
+  );
+
+  if (
+    user.role !==
+    'AGENT'
+  ) {
     return (
       <main className="nova-loading">
         Esta bandeja está disponible
@@ -547,12 +1122,101 @@ export function InboxPage({
     );
   }
 
-  if (!workspaceId) {
+  if (
+    !workspaceId
+  ) {
     return (
       <main className="nova-loading">
         El usuario no tiene un
         Workspace asociado.
       </main>
+    );
+  }
+
+  /*
+   * El backend de AGENT solamente
+   * entrega:
+   *
+   * - assignedAgentId = null;
+   * - conversaciones asignadas
+   *   al propio agente.
+   *
+   * Por eso podemos separar la
+   * bandeja con este criterio.
+   */
+  const unassignedConversations =
+    conversations.filter(
+      (
+        conversation,
+      ) =>
+        conversation.assignedAgentId ===
+        null,
+    );
+
+  const myConversations =
+    conversations.filter(
+      (
+        conversation,
+      ) =>
+        conversation.assignedAgentId !==
+        null,
+    );
+
+  function renderConversation(
+    conversation:
+      ConversationSummary,
+  ) {
+    const selected =
+      selectedConversationId ===
+      conversation.id;
+
+    return (
+      <button
+        type="button"
+        key={
+          conversation.id
+        }
+        className={
+          selected
+            ? 'nova-inbox__conversation nova-inbox__conversation--selected'
+            : 'nova-inbox__conversation'
+        }
+        onClick={() => {
+          void loadConversation(
+            conversation.id,
+          );
+        }}
+      >
+        <div className="nova-inbox__conversation-top">
+          <strong>
+            Visitante{' '}
+            {conversation.visitor.id.slice(
+              0,
+              8,
+            )}
+          </strong>
+
+          <span>
+            {formatTime(
+              conversation.updatedAt,
+            )}
+          </span>
+        </div>
+
+        <div className="nova-inbox__conversation-preview">
+          {getLastMessage(
+            conversation,
+          )}
+        </div>
+
+        <div className="nova-inbox__conversation-bottom">
+          <AppStatus
+            status={
+              conversation.status
+            }
+          />
+        </div>
+      </button>
     );
   }
 
@@ -613,7 +1277,7 @@ export function InboxPage({
                 {
                   conversations.length
                 }{' '}
-                asignadas
+                en tu bandeja
               </p>
             </div>
           </div>
@@ -630,71 +1294,78 @@ export function InboxPage({
               </strong>
 
               <span>
-                No tienes conversaciones
-                asignadas actualmente.
+                No hay conversaciones
+                disponibles actualmente.
               </span>
             </div>
           ) : (
-            <div className="nova-inbox__conversation-list">
-              {conversations.map(
-                (
-                  conversation,
-                ) => {
-                  const selected =
-                    selectedConversationId ===
-                    conversation.id;
+            <>
+              <section className="nova-inbox__conversation-group">
+                <div className="nova-inbox__conversation-group-header">
+                  <strong>
+                    Sin asignar
+                  </strong>
 
-                  return (
-                    <button
-                      type="button"
-                      key={
-                        conversation.id
-                      }
-                      className={
-                        selected
-                          ? 'nova-inbox__conversation nova-inbox__conversation--selected'
-                          : 'nova-inbox__conversation'
-                      }
-                      onClick={() => {
-                        void loadConversation(
-                          conversation.id,
-                        );
-                      }}
-                    >
-                      <div className="nova-inbox__conversation-top">
-                        <strong>
-                          Visitante{' '}
-                          {conversation.visitor.id.slice(
-                            0,
-                            8,
-                          )}
-                        </strong>
+                  <span>
+                    {
+                      unassignedConversations.length
+                    }
+                  </span>
+                </div>
 
-                        <span>
-                          {formatTime(
-                            conversation.updatedAt,
-                          )}
-                        </span>
-                      </div>
-
-                      <div className="nova-inbox__conversation-preview">
-                        {getLastMessage(
+                {unassignedConversations.length ===
+                0 ? (
+                  <div className="nova-inbox__empty">
+                    No hay conversaciones
+                    sin asignar.
+                  </div>
+                ) : (
+                  <div className="nova-inbox__conversation-list">
+                    {unassignedConversations.map(
+                      (
+                        conversation,
+                      ) =>
+                        renderConversation(
                           conversation,
-                        )}
-                      </div>
+                        ),
+                    )}
+                  </div>
+                )}
+              </section>
 
-                      <div className="nova-inbox__conversation-bottom">
-                        <AppStatus
-                          status={
-                            conversation.status
-                          }
-                        />
-                      </div>
-                    </button>
-                  );
-                },
-              )}
-            </div>
+              <section className="nova-inbox__conversation-group">
+                <div className="nova-inbox__conversation-group-header">
+                  <strong>
+                    Mis conversaciones
+                  </strong>
+
+                  <span>
+                    {
+                      myConversations.length
+                    }
+                  </span>
+                </div>
+
+                {myConversations.length ===
+                0 ? (
+                  <div className="nova-inbox__empty">
+                    Aún no has tomado
+                    conversaciones.
+                  </div>
+                ) : (
+                  <div className="nova-inbox__conversation-list">
+                    {myConversations.map(
+                      (
+                        conversation,
+                      ) =>
+                        renderConversation(
+                          conversation,
+                        ),
+                    )}
+                  </div>
+                )}
+              </section>
+            </>
           )}
         </aside>
 
@@ -742,14 +1413,40 @@ export function InboxPage({
                   </span>
                 </div>
 
-                <AppStatus
-                  status={
-                    activeConversation.status
-                  }
-                />
+                <div className="nova-inbox__chat-header-actions">
+                  <AppStatus
+                    status={
+                      activeConversation.status
+                    }
+                  />
+
+                  {activeConversation
+                    .assignedAgentId ===
+                    null && (
+                    <button
+                      type="button"
+                      className="nova-inbox__claim-button"
+                      disabled={
+                        claimingConversationId ===
+                        activeConversation.id
+                      }
+                      onClick={() => {
+                        void handleClaimConversation();
+                      }}
+                    >
+                      {claimingConversationId ===
+                      activeConversation.id
+                        ? 'Tomando...'
+                        : 'Tomar'}
+                    </button>
+                  )}
+                </div>
               </header>
 
-              <div className="nova-inbox__messages">
+              <div
+                className="nova-inbox__messages"
+                ref={messagesContainerRef}
+              >
                 {activeConversation
                   .messages.length ===
                 0 ? (
@@ -760,7 +1457,9 @@ export function InboxPage({
                   </div>
                 ) : (
                   activeConversation.messages.map(
-                    (message) => (
+                    (
+                      message,
+                    ) => (
                       <div
                         key={
                           message.id
@@ -808,22 +1507,124 @@ export function InboxPage({
                   )
                 )}
 
-                <div
-                  ref={
-                    messagesEndRef
-                  }
-                />
               </div>
 
-              <footer className="nova-inbox__composer-placeholder">
-                En el siguiente paso
-                habilitaremos respuestas
-                del agente.
-              </footer>
+              {activeConversation
+                .assignedAgentId ===
+              null ? (
+                <footer className="nova-inbox__composer-placeholder">
+                  Toma esta conversación
+                  para poder responder.
+                </footer>
+              ) : (
+                <footer className="nova-inbox__composer-placeholder">
+                  Conversación asignada a ti.
+                  En el siguiente paso
+                  habilitaremos las respuestas.
+                </footer>
+              )}
             </>
           ) : null}
         </section>
       </div>
+
+      {notification && (
+        <div
+          role={
+            notification.type ===
+            'warning'
+              ? 'alert'
+              : 'status'
+          }
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            right: '24px',
+            bottom: error
+              ? '88px'
+              : '24px',
+            zIndex: 1000,
+            width: 'min(360px, calc(100vw - 48px))',
+            padding: '14px 16px',
+            borderRadius: '12px',
+            background:
+              notification.type ===
+              'success'
+                ? '#163d2c'
+                : '#3d2f16',
+            color: '#ffffff',
+            boxShadow:
+              '0 14px 36px rgba(0, 0, 0, 0.28)',
+            border:
+              '1px solid rgba(255, 255, 255, 0.12)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+            }}
+          >
+            <strong
+              style={{
+                display: 'block',
+                marginBottom: '4px',
+              }}
+            >
+              {notification.type ===
+              'success'
+                ? '✓ '
+                : '⚠ '}
+              {notification.title}
+            </strong>
+
+            <span
+              style={{
+                opacity: 0.9,
+              }}
+            >
+              {notification.message}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Cerrar notificación"
+            onClick={() => {
+              setNotification(
+                null,
+              );
+
+              if (
+                notificationTimeoutRef
+                  .current !==
+                null
+              ) {
+                window.clearTimeout(
+                  notificationTimeoutRef
+                    .current,
+                );
+
+                notificationTimeoutRef.current =
+                  null;
+              }
+            }}
+            style={{
+              border: 0,
+              padding: 0,
+              background: 'transparent',
+              color: 'inherit',
+              fontSize: '20px',
+              lineHeight: 1,
+              cursor: 'pointer',
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {error && (
         <div
@@ -835,7 +1636,9 @@ export function InboxPage({
           <button
             type="button"
             onClick={() => {
-              setError(null);
+              setError(
+                null,
+              );
             }}
           >
             ×

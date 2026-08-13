@@ -133,6 +133,30 @@ export async function getConversation(
   ) as ConversationDetail;
 }
 
+export async function claimConversation(
+  accessToken: string,
+  workspaceId: string,
+  conversationId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/conversations/${conversationId}/claim`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo tomar la conversación',
+  );
+
+  return (
+    await response.json()
+  ) as ConversationSummary;
+}
+
 export async function sendAgentTextMessage(
   accessToken: string,
   workspaceId: string,
