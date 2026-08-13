@@ -580,42 +580,130 @@ input:disabled {
  * =========================================================
  */
 
-@media (
-  max-width: 520px
-) {
+@media (max-width: 520px) {
   .nova-widget-shell {
-    right: 12px;
-    bottom: 12px;
+    right: 16px;
+    bottom: 16px;
   }
 
+  /*
+   * En móvil, al abrir Nova usamos
+   * prácticamente toda la pantalla.
+   */
   .nova-chat {
     position: fixed;
 
-    right: 12px;
-    bottom: 84px;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 
-    width:
-      calc(
-        100vw - 24px
-      );
+    width: 100vw;
+    height: 100dvh;
 
-    height:
-      min(
-        640px,
-        calc(
-          100dvh - 108px
-        )
-      );
+    border: 0;
+    border-radius: 0;
 
-    border-radius: 16px;
+    box-shadow: none;
   }
 
-  .nova-launcher {
-    width: 56px;
-    height: 56px;
+  .nova-chat__header {
+    padding:
+      max(14px, env(safe-area-inset-top))
+      16px
+      14px;
+  }
+
+  .nova-chat__messages {
+    padding: 14px;
+
+    overscroll-behavior: contain;
+  }
+
+  .nova-message {
+    max-width: 86%;
+  }
+
+  .nova-message__image {
+    max-width: min(280px, 72vw);
+    max-height: 320px;
+  }
+
+  .nova-chat__composer {
+    padding:
+      10px
+      10px
+      max(10px, env(safe-area-inset-bottom));
+  }
+
+  /*
+   * 16px evita que algunos navegadores
+   * móviles hagan zoom automático al
+   * pulsar el input.
+   */
+  .nova-chat__composer
+  input[type='text'] {
+    font-size: 16px;
+  }
+
+  .nova-chat__attach {
+    width: 42px;
+    height: 42px;
+  }
+
+  .nova-chat__send {
+    min-height: 42px;
   }
 
   .nova-chat__status {
     display: none;
+  }
+
+  .nova-launcher {
+    width: 58px;
+    height: 58px;
+  }
+
+  .nova-launcher__icon {
+    font-size: 25px;
+  }
+
+  .nova-image-preview {
+    padding: 9px 12px;
+  }
+
+  .nova-image-preview__image {
+    width: 56px;
+    height: 56px;
+  }
+
+  .nova-image-preview__info span {
+    max-width: 55vw;
+  }
+}
+
+/*
+ * Teléfonos especialmente pequeños.
+ */
+@media (max-width: 360px) {
+  .nova-chat__header {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .nova-chat__messages {
+    padding: 12px;
+  }
+
+  .nova-chat__composer {
+    gap: 6px;
+  }
+
+  .nova-chat__send {
+    padding: 0 11px;
+  }
+
+  .nova-message {
+    max-width: 90%;
   }
 }
