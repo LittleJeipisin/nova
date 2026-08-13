@@ -18,6 +18,7 @@ import {
   getNovaMessages,
   getNovaSession,
   NOVA_API_URL,
+  restoreNovaSession,
   sendNovaImageMessage,
   sendNovaTextMessage,
 } from './nova';
@@ -28,19 +29,39 @@ import type {
   NovaWidgetConfig,
 } from './nova';
 
-function formatMessageTime(createdAt: string) {
-  return new Intl.DateTimeFormat('es-CL', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(new Date(createdAt));
+function formatMessageTime(
+  createdAt: string,
+) {
+  return new Intl.DateTimeFormat(
+    'es-CL',
+    {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    },
+  ).format(
+    new Date(
+      createdAt,
+    ),
+  );
 }
 
-function sortMessages(messages: NovaMessage[]) {
-  return [...messages].sort(
-    (a, b) =>
-      new Date(a.createdAt).getTime() -
-      new Date(b.createdAt).getTime(),
+function sortMessages(
+  messages: NovaMessage[],
+) {
+  return [
+    ...messages,
+  ].sort(
+    (
+      a,
+      b,
+    ) =>
+      new Date(
+        a.createdAt,
+      ).getTime() -
+      new Date(
+        b.createdAt,
+      ).getTime(),
   );
 }
 
@@ -48,195 +69,417 @@ function App() {
   const [
     config,
     setConfig,
-  ] = useState<NovaWidgetConfig | null>(null);
+  ] =
+    useState<NovaWidgetConfig | null>(
+      null,
+    );
 
   const [
     configError,
     setConfigError,
-  ] = useState<string | null>(null);
+  ] =
+    useState<string | null>(
+      null,
+    );
 
   const [
     isOpen,
     setIsOpen,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
   const [
     connectionStatus,
     setConnectionStatus,
-  ] = useState('Conectando...');
+  ] =
+    useState(
+      'Disponible',
+    );
 
   const [
     session,
     setSession,
-  ] = useState<NovaSession | null>(null);
+  ] =
+    useState<NovaSession | null>(
+      null,
+    );
+
+  const [
+    initializingSession,
+    setInitializingSession,
+  ] =
+    useState(
+      false,
+    );
 
   const [
     messages,
     setMessages,
-  ] = useState<NovaMessage[]>([]);
+  ] =
+    useState<NovaMessage[]>(
+      [],
+    );
 
   const [
     input,
     setInput,
-  ] = useState('');
+  ] =
+    useState(
+      '',
+    );
 
   const [
     sending,
     setSending,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
   const [
     selectedImage,
     setSelectedImage,
-  ] = useState<File | null>(null);
+  ] =
+    useState<File | null>(
+      null,
+    );
 
   const [
     imagePreview,
     setImagePreview,
-  ] = useState<string | null>(null);
+  ] =
+    useState<string | null>(
+      null,
+    );
 
   const [
     error,
     setError,
-  ] = useState<string | null>(null);
+  ] =
+    useState<string | null>(
+      null,
+    );
 
   const messagesEndRef =
-    useRef<HTMLDivElement | null>(null);
+    useRef<HTMLDivElement | null>(
+      null,
+    );
 
   const fileInputRef =
-    useRef<HTMLInputElement | null>(null);
+    useRef<HTMLInputElement | null>(
+      null,
+    );
 
   const socketRef =
-    useRef<ReturnType<typeof connectNovaSocket> | null>(null);
+    useRef<
+      ReturnType<
+        typeof connectNovaSocket
+      > | null
+    >(
+      null,
+    );
 
   const initializingRef =
-    useRef(false);
+    useRef(
+      false,
+    );
 
-  const addMessage = useCallback(
-    (message: NovaMessage) => {
-      setMessages((currentMessages) => {
-        const alreadyExists =
-          currentMessages.some(
-            (currentMessage) =>
-              currentMessage.id === message.id,
+  const addMessage =
+    useCallback(
+      (
+        message:
+          NovaMessage,
+      ) => {
+        setMessages(
+          (
+            currentMessages,
+          ) => {
+            const alreadyExists =
+              currentMessages.some(
+                (
+                  currentMessage,
+                ) =>
+                  currentMessage.id ===
+                  message.id,
+              );
+
+            if (
+              alreadyExists
+            ) {
+              return currentMessages;
+            }
+
+            return sortMessages([
+              ...currentMessages,
+              message,
+            ]);
+          },
+        );
+      },
+      [],
+    );
+
+  const mergeMessages =
+    useCallback(
+      (
+        history:
+          NovaMessage[],
+      ) => {
+        setMessages(
+          (
+            currentMessages,
+          ) => {
+            const byId =
+              new Map<
+                string,
+                NovaMessage
+              >();
+
+            for (
+              const message
+              of history
+            ) {
+              byId.set(
+                message.id,
+                message,
+              );
+            }
+
+            for (
+              const message
+              of currentMessages
+            ) {
+              byId.set(
+                message.id,
+                message,
+              );
+            }
+
+            return sortMessages(
+              Array.from(
+                byId.values(),
+              ),
+            );
+          },
+        );
+      },
+      [],
+    );
+
+  /*
+   * Conecta Socket únicamente cuando
+   * ya existe una Conversation real.
+   */
+  const connectSessionSocket =
+    useCallback(
+      (
+        novaSession:
+          NovaSession,
+      ) => {
+        if (
+          socketRef.current
+        ) {
+          return;
+        }
+
+        socketRef.current =
+          connectNovaSocket(
+            novaSession.visitorToken,
+            novaSession.conversation.id,
+            {
+              async onJoined() {
+                setConnectionStatus(
+                  'En línea',
+                );
+
+                try {
+                  const history =
+                    await getNovaMessages(
+                      novaSession.visitorToken,
+                      novaSession.conversation.id,
+                    );
+
+                  mergeMessages(
+                    history,
+                  );
+                } catch (
+                  err
+                ) {
+                  console.error(
+                    err,
+                  );
+
+                  setError(
+                    err instanceof
+                      Error
+                      ? err.message
+                      : 'No se pudo cargar el historial',
+                  );
+                }
+              },
+
+              onMessage(
+                message,
+              ) {
+                addMessage(
+                  message,
+                );
+              },
+
+              onDisconnect() {
+                setConnectionStatus(
+                  'Desconectado',
+                );
+              },
+
+              onError(
+                message,
+              ) {
+                setError(
+                  message,
+                );
+              },
+            },
+          );
+      },
+      [
+        addMessage,
+        mergeMessages,
+      ],
+    );
+
+  /*
+   * Al cargar la página solamente
+   * obtenemos configuración pública.
+   *
+   * No se crea Visitor.
+   * No se crea Conversation.
+   */
+  useEffect(
+    () => {
+      let cancelled =
+        false;
+
+      async function loadConfig() {
+        try {
+          const novaConfig =
+            await getNovaConfig();
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setConfig(
+            novaConfig,
           );
 
-        if (alreadyExists) {
-          return currentMessages;
+          setConfigError(
+            null,
+          );
+        } catch (
+          err
+        ) {
+          console.error(
+            'Error cargando configuración Nova:',
+            err,
+          );
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setConfigError(
+            err instanceof
+              Error
+              ? err.message
+              : 'Widget no disponible',
+          );
         }
-
-        return sortMessages([
-          ...currentMessages,
-          message,
-        ]);
-      });
-    },
-    [],
-  );
-
-  const mergeMessages = useCallback(
-    (history: NovaMessage[]) => {
-      setMessages((currentMessages) => {
-        const byId =
-          new Map<string, NovaMessage>();
-
-        for (const message of history) {
-          byId.set(message.id, message);
-        }
-
-        for (const message of currentMessages) {
-          byId.set(message.id, message);
-        }
-
-        return sortMessages(
-          Array.from(byId.values()),
-        );
-      });
-    },
-    [],
-  );
-
-  /*
-   * Cargamos únicamente la configuración
-   * pública al cargar la página.
-   *
-   * Esto NO crea Visitor ni conversación.
-   */
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadConfig() {
-      try {
-        const novaConfig =
-          await getNovaConfig();
-
-        if (cancelled) {
-          return;
-        }
-
-        setConfig(novaConfig);
-        setConfigError(null);
-      } catch (err) {
-        console.error(
-          'Error cargando configuración Nova:',
-          err,
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        setConfigError(
-          err instanceof Error
-            ? err.message
-            : 'Widget no disponible',
-        );
       }
-    }
 
-    void loadConfig();
+      void loadConfig();
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return () => {
+        cancelled =
+          true;
+      };
+    },
+    [],
+  );
 
   /*
-   * Desconectamos Socket únicamente cuando
-   * el componente realmente se desmonta.
+   * Desconectamos Socket solamente
+   * cuando el componente desaparece.
    */
-  useEffect(() => {
-    return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, []);
+  useEffect(
+    () => {
+      return () => {
+        socketRef.current
+          ?.disconnect();
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
+        socketRef.current =
+          null;
+      };
+    },
+    [],
+  );
 
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    });
-  }, [
-    messages,
-    isOpen,
-  ]);
+  useEffect(
+    () => {
+      if (!isOpen) {
+        return;
+      }
 
-  useEffect(() => {
-    if (!imagePreview) {
-      return;
-    }
+      messagesEndRef.current
+        ?.scrollIntoView({
+          behavior:
+            'smooth',
+        });
+    },
+    [
+      messages,
+      isOpen,
+    ],
+  );
 
-    return () => {
-      URL.revokeObjectURL(
-        imagePreview,
-      );
-    };
-  }, [imagePreview]);
+  useEffect(
+    () => {
+      if (
+        !imagePreview
+      ) {
+        return;
+      }
 
+      return () => {
+        URL.revokeObjectURL(
+          imagePreview,
+        );
+      };
+    },
+    [
+      imagePreview,
+    ],
+  );
+
+  /*
+   * Al abrir el widget:
+   *
+   * - si no existe visitorToken,
+   *   no hacemos nada;
+   *
+   * - si existe visitorToken pero no
+   *   hay conversación con mensajes,
+   *   tampoco creamos nada;
+   *
+   * - si existe una conversación real,
+   *   restauramos historial + Socket.
+   */
   async function initializeNovaSession() {
     if (
       session ||
@@ -246,75 +489,45 @@ function App() {
       return;
     }
 
-    initializingRef.current = true;
+    initializingRef.current =
+      true;
+
+    setInitializingSession(
+      true,
+    );
 
     try {
       setConnectionStatus(
         'Conectando...',
       );
 
-      setError(null);
-
-      const novaSession =
-        await getNovaSession();
-
-      setSession(
-        novaSession,
+      setError(
+        null,
       );
 
-      socketRef.current =
-        connectNovaSocket(
-          novaSession.visitorToken,
-          novaSession.conversation.id,
-          {
-            async onJoined() {
-              setConnectionStatus(
-                'En línea',
-              );
+      const restoredSession =
+        await restoreNovaSession();
 
-              try {
-                const history =
-                  await getNovaMessages(
-                    novaSession.visitorToken,
-                    novaSession.conversation.id,
-                  );
-
-                mergeMessages(
-                  history,
-                );
-              } catch (err) {
-                console.error(
-                  err,
-                );
-
-                setError(
-                  err instanceof Error
-                    ? err.message
-                    : 'No se pudo cargar el historial',
-                );
-              }
-            },
-
-            onMessage(message) {
-              addMessage(
-                message,
-              );
-            },
-
-            onDisconnect() {
-              setConnectionStatus(
-                'Desconectado',
-              );
-            },
-
-            onError(message) {
-              setError(
-                message,
-              );
-            },
-          },
+      if (
+        !restoredSession
+      ) {
+        setConnectionStatus(
+          'Disponible',
         );
-    } catch (err) {
+
+        return;
+      }
+
+      setSession(
+        restoredSession,
+      );
+
+      connectSessionSocket(
+        restoredSession,
+      );
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
@@ -324,12 +537,18 @@ function App() {
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'Error al iniciar Nova',
       );
     } finally {
-      initializingRef.current = false;
+      initializingRef.current =
+        false;
+
+      setInitializingSession(
+        false,
+      );
     }
   }
 
@@ -359,14 +578,17 @@ function App() {
   }
 
   function openFilePicker() {
-    fileInputRef.current?.click();
+    fileInputRef.current
+      ?.click();
   }
 
   function handleImageSelected(
-    event: ChangeEvent<HTMLInputElement>,
+    event:
+      ChangeEvent<HTMLInputElement>,
   ) {
     const file =
-      event.target.files?.[0];
+      event.target.files
+        ?.[0];
 
     if (!file) {
       return;
@@ -395,7 +617,9 @@ function App() {
     }
 
     const maxSize =
-      5 * 1024 * 1024;
+      5 *
+      1024 *
+      1024;
 
     if (
       file.size >
@@ -427,13 +651,14 @@ function App() {
   }
 
   async function handleSubmit(
-    event: SyntheticEvent<HTMLFormElement>,
+    event:
+      SyntheticEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
     if (
-      !session ||
-      sending
+      sending ||
+      initializingSession
     ) {
       return;
     }
@@ -457,23 +682,60 @@ function App() {
         null,
       );
 
-      let message: NovaMessage;
+      /*
+       * Si aún no existe sesión,
+       * este es el momento en que
+       * realmente creamos:
+       *
+       * Visitor
+       * Conversation
+       *
+       * porque el usuario ya decidió
+       * enviar algo.
+       */
+      let activeSession =
+        session;
 
-      if (selectedImage) {
+      if (
+        !activeSession
+      ) {
+        setConnectionStatus(
+          'Conectando...',
+        );
+
+        activeSession =
+          await getNovaSession();
+
+        setSession(
+          activeSession,
+        );
+
+        connectSessionSocket(
+          activeSession,
+        );
+      }
+
+      let message:
+        NovaMessage;
+
+      if (
+        selectedImage
+      ) {
         message =
           await sendNovaImageMessage(
-            session.visitorToken,
-            session.conversation.id,
+            activeSession.visitorToken,
+            activeSession.conversation.id,
             selectedImage,
-            content || undefined,
+            content ||
+              undefined,
           );
 
         clearSelectedImage();
       } else {
         message =
           await sendNovaTextMessage(
-            session.visitorToken,
-            session.conversation.id,
+            activeSession.visitorToken,
+            activeSession.conversation.id,
             content,
           );
       }
@@ -485,13 +747,16 @@ function App() {
       setInput(
         '',
       );
-    } catch (err) {
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo enviar el mensaje',
       );
@@ -514,7 +779,8 @@ function App() {
   }
 
   const positionClass =
-    config.position === 'LEFT'
+    config.position ===
+    'LEFT'
       ? 'nova-widget-shell--left'
       : 'nova-widget-shell--right';
 
@@ -531,7 +797,9 @@ function App() {
             <div className="nova-chat__identity">
               <div className="nova-chat__avatar">
                 {config.title
-                  .charAt(0)
+                  .charAt(
+                    0,
+                  )
                   .toUpperCase()}
               </div>
 
@@ -548,7 +816,9 @@ function App() {
 
             <div className="nova-chat__header-actions">
               <span className="nova-chat__status">
-                {connectionStatus}
+                {
+                  connectionStatus
+                }
               </span>
 
               <button
@@ -569,11 +839,15 @@ function App() {
 
           <div className="nova-chat__messages">
             <div className="nova-message nova-message--system">
-              {config.welcomeMessage}
+              {
+                config.welcomeMessage
+              }
             </div>
 
             {messages.map(
-              (message) => (
+              (
+                message,
+              ) => (
                 <div
                   key={
                     message.id
@@ -664,7 +938,9 @@ function App() {
                 </strong>
 
                 <span>
-                  {selectedImage?.name}
+                  {
+                    selectedImage?.name
+                  }
                 </span>
               </div>
             </div>
@@ -695,8 +971,8 @@ function App() {
                 openFilePicker
               }
               disabled={
-                !session ||
-                sending
+                sending ||
+                initializingSession
               }
               title="Adjuntar imagen"
               aria-label="Adjuntar imagen"
@@ -710,7 +986,9 @@ function App() {
                 input
               }
               onChange={
-                (event) => {
+                (
+                  event,
+                ) => {
                   setInput(
                     event.target.value,
                   );
@@ -722,8 +1000,8 @@ function App() {
                   : 'Escribe un mensaje...'
               }
               disabled={
-                !session ||
-                sending
+                sending ||
+                initializingSession
               }
             />
 
@@ -731,8 +1009,8 @@ function App() {
               type="submit"
               className="nova-chat__send"
               disabled={
-                !session ||
                 sending ||
+                initializingSession ||
                 (
                   !input.trim() &&
                   !selectedImage

@@ -9,10 +9,7 @@ import {
 
 import { JwtService } from '@nestjs/jwt';
 
-import {
-  Server,
-  Socket,
-} from 'socket.io';
+import { Server, Socket } from 'socket.io';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { VisitorsService } from '../visitors/visitors.service';
@@ -37,10 +34,11 @@ export class RealtimeGateway {
    * VISITOR
    * =========================================================
    *
-   * El Visitor ya NO envía visitorId.
+   * El Visitor entra realmente en:
    *
-   * Su identidad se obtiene exclusivamente desde
-   * visitorToken, firmado con VISITOR_JWT_SECRET.
+   * conversation:{conversationId}
+   *
+   * Esta room queda reservada para el Visitor.
    */
   @SubscribeMessage('conversation:join:visitor')
   async joinVisitorConversation(
@@ -53,88 +51,62 @@ export class RealtimeGateway {
       conversationId: string;
     },
   ) {
-    const workspace =
-      await this.prisma.workspace.findUnique({
-        where: {
-          slug: data.workspaceSlug
-            .trim()
-            .toLowerCase(),
-        },
-      });
+    const workspace = await this.prisma.workspace.findUnique({
+      where: {
+        slug: data.workspaceSlug.trim().toLowerCase(),
+      },
+    });
 
     if (!workspace) {
-      throw new WsException(
-        'Workspace no encontrado',
-      );
+      throw new WsException('Workspace no encontrado');
     }
 
-    if (
-      workspace.status !== 'ACTIVE'
-    ) {
-      throw new WsException(
-        'El workspace está inactivo',
-      );
+    if (workspace.status !== 'ACTIVE') {
+      throw new WsException('El workspace está inactivo');
     }
 
-    const visitorToken =
-      this.getVisitorSocketToken(
-        client,
-      );
+    const visitorToken = this.getVisitorSocketToken(client);
 
-    let visitor;
+    let verifiedVisitor: unknown;
 
     try {
-      visitor =
-        await this.visitorsService
-          .verifyVisitorToken(
-            visitorToken,
-            workspace.id,
-          );
-    } catch (error: any) {
-      throw new WsException(
-        error?.message ||
-          'Token de visitante inválido',
+      verifiedVisitor = await this.visitorsService.verifyVisitorToken(
+        visitorToken,
+        workspace.id,
       );
+    } catch (error: unknown) {
+      throw new WsException(
+        this.getErrorMessage(error, 'Token de visitante inválido'),
+      );
+    }
+
+    const visitorId = this.getVerifiedVisitorId(verifiedVisitor);
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: data.conversationId,
+        workspaceId: workspace.id,
+        visitorId,
+
+        status: {
+          in: ['OPEN', 'PENDING'],
+        },
+      },
+    });
+
+    if (!conversation) {
+      throw new WsException('Conversación no encontrada o no autorizada');
     }
 
     /*
-     * Además de validar el token,
-     * comprobamos que la conversación
-     * pertenece realmente a ese Visitor.
+     * Solo el Visitor entra realmente
+     * en la room de conversación.
      */
-    const conversation =
-      await this.prisma.conversation.findFirst({
-        where: {
-          id: data.conversationId,
-
-          workspaceId:
-            workspace.id,
-
-          visitorId:
-            visitor.id,
-
-          status: {
-            in: [
-              'OPEN',
-              'PENDING',
-            ],
-          },
-        },
-      });
-
-    if (!conversation) {
-      throw new WsException(
-        'Conversación no encontrada o no autorizada',
-      );
-    }
-
-    await client.join(
-      `conversation:${conversation.id}`,
-    );
+    await client.join(`conversation:${conversation.id}`);
 
     await this.prisma.visitor.update({
       where: {
-        id: visitor.id,
+        id: visitorId,
       },
 
       data: {
@@ -143,20 +115,35 @@ export class RealtimeGateway {
     });
 
     return {
-      event:
-        'conversation:joined',
+      event: 'conversation:joined',
 
       data: {
-        conversationId:
-          conversation.id,
+        conversationId: conversation.id,
       },
     };
   }
 
   /*
    * =========================================================
-   * AGENT → CONVERSACIÓN
+   * AGENT -> CONVERSACIÓN
    * =========================================================
+   *
+   * IMPORTANTE:
+   *
+   * El AGENT ya NO entra en:
+   *
+   * conversation:{conversationId}
+   *
+   * Los mensajes internos se distribuyen mediante:
+   *
+   * user:{userId}
+   * workspace:{workspaceId}:unassigned
+   *
+   * Conservamos este evento temporalmente porque
+   * el frontend actual todavía lo envía.
+   *
+   * Únicamente validamos que el AGENT pueda ver
+   * la conversación y devolvemos confirmación.
    */
   @SubscribeMessage('conversation:join:agent')
   async joinAgentConversation(
@@ -169,67 +156,69 @@ export class RealtimeGateway {
       conversationId: string;
     },
   ) {
-    const user =
-      await this.getAuthenticatedUser(
-        client,
-      );
+    const user = await this.getAuthenticatedUser(client);
 
     if (user.role !== 'AGENT') {
-      throw new WsException(
-        'Rol no autorizado',
-      );
+      throw new WsException('Rol no autorizado');
     }
 
-    if (
-      user.workspaceId !==
-      data.workspaceId
-    ) {
-      throw new WsException(
-        'No tienes acceso a este workspace',
-      );
+    if (user.workspaceId !== data.workspaceId) {
+      throw new WsException('No tienes acceso a este workspace');
     }
 
-    const conversation =
-      await this.prisma.conversation.findFirst({
-        where: {
-          id:
-            data.conversationId,
+    /*
+     * Puede visualizar:
+     *
+     * - conversación sin asignar;
+     * - conversación asignada a él.
+     *
+     * No puede visualizar una conversación
+     * perteneciente a otro agente.
+     */
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: data.conversationId,
 
-          workspaceId:
-            data.workspaceId,
+        workspaceId: data.workspaceId,
 
-          assignedAgentId:
-            user.id,
-
-          status: {
-            in: [
-              'OPEN',
-              'PENDING',
-            ],
+        OR: [
+          {
+            assignedAgentId: null,
           },
+          {
+            assignedAgentId: user.id,
+          },
+        ],
+
+        status: {
+          in: ['OPEN', 'PENDING'],
         },
-      });
+      },
+    });
 
     if (!conversation) {
-      throw new WsException(
-        'Conversación no encontrada o no autorizada',
-      );
+      throw new WsException('Conversación no encontrada o no autorizada');
     }
 
-    await client.join(
-      `conversation:${conversation.id}`,
-    );
+    /*
+     * NO hacemos:
+     *
+     * client.join(
+     *   `conversation:${conversation.id}`,
+     * );
+     *
+     * Esto evita que un agente conserve
+     * acceso realtime después de que
+     * la conversación sea tomada o reasignada.
+     */
 
     return {
-      event:
-        'conversation:joined',
+      event: 'conversation:joined',
 
       data: {
-        conversationId:
-          conversation.id,
+        conversationId: conversation.id,
 
-        role:
-          'AGENT',
+        role: 'AGENT',
       },
     };
   }
@@ -249,49 +238,34 @@ export class RealtimeGateway {
       workspaceId: string;
     },
   ) {
-    const user =
-      await this.getAuthenticatedUser(
-        client,
-      );
+    const user = await this.getAuthenticatedUser(client);
 
-    const workspace =
-      await this.prisma.workspace.findUnique({
-        where: {
-          id: data.workspaceId,
-        },
-      });
+    const workspace = await this.prisma.workspace.findUnique({
+      where: {
+        id: data.workspaceId,
+      },
+    });
 
     if (!workspace) {
-      throw new WsException(
-        'Workspace no encontrado',
-      );
+      throw new WsException('Workspace no encontrado');
     }
 
     /*
-     * PLATFORM_ADMIN puede entrar a
-     * cualquier Workspace.
+     * PLATFORM_ADMIN puede entrar
+     * a cualquier Workspace.
      */
-    if (
-      user.role ===
-      'PLATFORM_ADMIN'
-    ) {
-      await client.join(
-        `workspace:${workspace.id}`,
-      );
+    if (user.role === 'PLATFORM_ADMIN') {
+      await client.join(`workspace:${workspace.id}`);
 
       return {
-        event:
-          'workspace:joined',
+        event: 'workspace:joined',
 
         data: {
-          workspaceId:
-            workspace.id,
+          workspaceId: workspace.id,
 
-          room:
-            `workspace:${workspace.id}`,
+          room: `workspace:${workspace.id}`,
 
-          role:
-            user.role,
+          role: user.role,
         },
       };
     }
@@ -300,106 +274,91 @@ export class RealtimeGateway {
      * OWNER / ADMIN / AGENT solamente
      * pueden usar su propio Workspace.
      */
-    if (
-      user.workspaceId !==
-      workspace.id
-    ) {
-      throw new WsException(
-        'No tienes acceso a este workspace',
-      );
+    if (user.workspaceId !== workspace.id) {
+      throw new WsException('No tienes acceso a este workspace');
     }
 
-    if (
-      workspace.status !== 'ACTIVE'
-    ) {
-      throw new WsException(
-        'El workspace está inactivo',
-      );
+    if (workspace.status !== 'ACTIVE') {
+      throw new WsException('El workspace está inactivo');
     }
 
     /*
-     * AGENT NO entra a la room general.
+     * AGENT entra en DOS rooms:
      *
-     * Cada Agent tiene su propia room,
-     * evitando recibir conversaciones
-     * asignadas a otros agentes.
+     * user:{userId}
+     *
+     *   Conversaciones asignadas
+     *   específicamente a él.
+     *
+     * workspace:{workspaceId}:unassigned
+     *
+     *   Conversaciones todavía
+     *   sin asignar.
+     *
+     * Nunca entra en la room general:
+     *
+     * workspace:{workspaceId}
+     *
+     * porque puede contener información
+     * de conversaciones de otros agentes.
      */
     if (user.role === 'AGENT') {
-      await client.join(
-        `user:${user.id}`,
-      );
+      const userRoom = `user:${user.id}`;
+
+      const unassignedRoom = `workspace:${workspace.id}:unassigned`;
+
+      await client.join(userRoom);
+
+      await client.join(unassignedRoom);
 
       return {
-        event:
-          'workspace:joined',
+        event: 'workspace:joined',
 
         data: {
-          workspaceId:
-            workspace.id,
+          workspaceId: workspace.id,
 
-          room:
-            `user:${user.id}`,
+          room: userRoom,
 
-          role:
-            user.role,
+          unassignedRoom,
+
+          role: user.role,
         },
       };
     }
 
     /*
-     * OWNER y ADMIN sí reciben la
-     * bandeja general del Workspace.
+     * OWNER y ADMIN reciben
+     * la bandeja general.
      */
-    if (
-      user.role === 'OWNER' ||
-      user.role === 'ADMIN'
-    ) {
-      await client.join(
-        `workspace:${workspace.id}`,
-      );
+    if (user.role === 'OWNER' || user.role === 'ADMIN') {
+      await client.join(`workspace:${workspace.id}`);
 
       return {
-        event:
-          'workspace:joined',
+        event: 'workspace:joined',
 
         data: {
-          workspaceId:
-            workspace.id,
+          workspaceId: workspace.id,
 
-          room:
-            `workspace:${workspace.id}`,
+          room: `workspace:${workspace.id}`,
 
-          role:
-            user.role,
+          role: user.role,
         },
       };
     }
 
-    throw new WsException(
-      'Rol no autorizado',
-    );
+    throw new WsException('Rol no autorizado');
   }
 
   /*
    * =========================================================
    * AUTENTICACIÓN DE USUARIOS INTERNOS
    * =========================================================
-   *
-   * AGENT / ADMIN / OWNER / PLATFORM_ADMIN
-   * usan JWT_SECRET.
    */
-  private async getAuthenticatedUser(
-    client: Socket,
-  ) {
-    const token =
-      this.getSocketToken(
-        client,
-      );
+  private async getAuthenticatedUser(client: Socket) {
+    const token = this.getSocketToken(client);
 
     if (!token) {
-      throw new WsException(
-        'Token no proporcionado',
-      );
+      throw new WsException('Token no proporcionado');
     }
 
     let payload: {
@@ -407,97 +366,59 @@ export class RealtimeGateway {
     };
 
     try {
-      payload =
-        await this.jwtService
-          .verifyAsync<{
-            sub: string;
-          }>(
-            token,
-          );
+      payload = await this.jwtService.verifyAsync<{
+        sub: string;
+      }>(token);
     } catch {
-      throw new WsException(
-        'Token inválido o expirado',
-      );
+      throw new WsException('Token inválido o expirado');
     }
 
-    const user =
-      await this.prisma.user.findUnique({
-        where: {
-          id: payload.sub,
-        },
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: payload.sub,
+      },
 
-        include: {
-          workspace: true,
-        },
-      });
+      include: {
+        workspace: true,
+      },
+    });
 
     if (!user) {
-      throw new WsException(
-        'Usuario no encontrado',
-      );
+      throw new WsException('Usuario no encontrado');
     }
 
-    if (
-      user.status !== 'ACTIVE'
-    ) {
-      throw new WsException(
-        'Usuario inactivo',
-      );
+    if (user.status !== 'ACTIVE') {
+      throw new WsException('Usuario inactivo');
     }
 
-    if (
-      user.mustChangePassword
-    ) {
-      throw new WsException(
-        'Debes cambiar tu contraseña antes de continuar',
-      );
+    if (user.mustChangePassword) {
+      throw new WsException('Debes cambiar tu contraseña antes de continuar');
     }
 
     /*
      * PLATFORM_ADMIN no pertenece
-     * a ningún Workspace.
+     * a un Workspace.
      */
-    if (
-      user.role !==
-      'PLATFORM_ADMIN'
-    ) {
+    if (user.role !== 'PLATFORM_ADMIN') {
       if (!user.workspace) {
-        throw new WsException(
-          'Usuario sin workspace',
-        );
+        throw new WsException('Usuario sin workspace');
       }
 
-      if (
-        user.workspace.status !==
-        'ACTIVE'
-      ) {
-        throw new WsException(
-          'El workspace está inactivo',
-        );
+      if (user.workspace.status !== 'ACTIVE') {
+        throw new WsException('El workspace está inactivo');
       }
     }
 
     /*
      * OWNER temporal.
      */
-    if (
-      user.role === 'OWNER' &&
-      user.ownerType ===
-        'TEMPORARY'
-    ) {
+    if (user.role === 'OWNER' && user.ownerType === 'TEMPORARY') {
       if (!user.expiresAt) {
-        throw new WsException(
-          'Owner temporal sin fecha de expiración',
-        );
+        throw new WsException('Owner temporal sin fecha de expiración');
       }
 
-      if (
-        user.expiresAt.getTime() <=
-        Date.now()
-      ) {
-        throw new WsException(
-          'El acceso temporal ha expirado',
-        );
+      if (user.expiresAt.getTime() <= Date.now()) {
+        throw new WsException('El acceso temporal ha expirado');
       }
     }
 
@@ -506,31 +427,43 @@ export class RealtimeGateway {
 
   /*
    * =========================================================
+   * VISITOR VERIFICADO
+   * =========================================================
+   */
+  private getVerifiedVisitorId(visitor: unknown): string {
+    if (typeof visitor !== 'object' || visitor === null || !('id' in visitor)) {
+      throw new WsException('Visitante inválido');
+    }
+
+    const id = visitor.id;
+
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new WsException('Visitante inválido');
+    }
+
+    return id;
+  }
+
+  /*
+   * =========================================================
    * TOKEN DEL VISITOR
    * =========================================================
-   *
-   * Se envía mediante:
-   *
-   * socket.auth.visitorToken
    */
-  private getVisitorSocketToken(
-    client: Socket,
-  ): string | undefined {
-    const visitorToken =
-      client.handshake.auth
-        ?.visitorToken;
+  private getVisitorSocketToken(client: Socket): string | undefined {
+    const auth: unknown = client.handshake.auth;
 
     if (
-      typeof visitorToken ===
-        'string' &&
-      visitorToken.trim()
+      typeof auth !== 'object' ||
+      auth === null ||
+      !('visitorToken' in auth)
     ) {
-      return visitorToken
-        .replace(
-          /^Bearer\s+/i,
-          '',
-        )
-        .trim();
+      return undefined;
+    }
+
+    const visitorToken = auth.visitorToken;
+
+    if (typeof visitorToken === 'string' && visitorToken.trim()) {
+      return visitorToken.replace(/^Bearer\s+/i, '').trim();
     }
 
     return undefined;
@@ -540,52 +473,37 @@ export class RealtimeGateway {
    * =========================================================
    * TOKEN DE USUARIOS INTERNOS
    * =========================================================
-   *
-   * Normalmente:
-   *
-   * socket.auth.token
    */
-  private getSocketToken(
-    client: Socket,
-  ): string | null {
-    const authToken =
-      client.handshake.auth
-        ?.token;
+  private getSocketToken(client: Socket): string | null {
+    const auth: unknown = client.handshake.auth;
 
-    if (
-      typeof authToken ===
-        'string' &&
-      authToken.trim()
-    ) {
-      return authToken
-        .replace(
-          /^Bearer\s+/i,
-          '',
-        )
-        .trim();
+    if (typeof auth === 'object' && auth !== null && 'token' in auth) {
+      const authToken = auth.token;
+
+      if (typeof authToken === 'string' && authToken.trim()) {
+        return authToken.replace(/^Bearer\s+/i, '').trim();
+      }
     }
 
-    /*
-     * También permitimos Authorization
-     * en los headers del handshake.
-     */
-    const authorization =
-      client.handshake.headers
-        .authorization;
+    const authorization = client.handshake.headers.authorization;
 
-    if (
-      typeof authorization ===
-        'string'
-    ) {
-      return authorization
-        .replace(
-          /^Bearer\s+/i,
-          '',
-        )
-        .trim();
+    if (typeof authorization === 'string') {
+      return authorization.replace(/^Bearer\s+/i, '').trim();
     }
 
     return null;
+  }
+
+  private getErrorMessage(error: unknown, fallbackMessage: string) {
+    if (typeof error === 'object' && error !== null && 'message' in error) {
+      const message = error.message;
+
+      if (typeof message === 'string') {
+        return message;
+      }
+    }
+
+    return fallbackMessage;
   }
 
   /*
@@ -594,48 +512,23 @@ export class RealtimeGateway {
    * =========================================================
    */
 
-  emitToConversation(
-    conversationId: string,
-    event: string,
-    data: unknown,
-  ) {
-    this.server
-      .to(
-        `conversation:${conversationId}`,
-      )
-      .emit(
-        event,
-        data,
-      );
+  /*
+   * Esta room queda reservada para
+   * sockets del Visitor.
+   */
+  emitToConversation(conversationId: string, event: string, data: unknown) {
+    this.server.to(`conversation:${conversationId}`).emit(event, data);
   }
 
-  emitToWorkspace(
-    workspaceId: string,
-    event: string,
-    data: unknown,
-  ) {
-    this.server
-      .to(
-        `workspace:${workspaceId}`,
-      )
-      .emit(
-        event,
-        data,
-      );
+  emitToWorkspace(workspaceId: string, event: string, data: unknown) {
+    this.server.to(`workspace:${workspaceId}`).emit(event, data);
   }
 
-  emitToUser(
-    userId: string,
-    event: string,
-    data: unknown,
-  ) {
-    this.server
-      .to(
-        `user:${userId}`,
-      )
-      .emit(
-        event,
-        data,
-      );
+  emitToUnassigned(workspaceId: string, event: string, data: unknown) {
+    this.server.to(`workspace:${workspaceId}:unassigned`).emit(event, data);
+  }
+
+  emitToUser(userId: string, event: string, data: unknown) {
+    this.server.to(`user:${userId}`).emit(event, data);
   }
 }
