@@ -14,6 +14,7 @@ import './App.css';
 
 import {
   connectNovaSocket,
+  getNovaConfig,
   getNovaMessages,
   getNovaSession,
   NOVA_API_URL,
@@ -24,6 +25,7 @@ import {
 import type {
   NovaMessage,
   NovaSession,
+  NovaWidgetConfig,
 } from './nova';
 
 function formatMessageTime(createdAt: string) {
@@ -43,6 +45,16 @@ function sortMessages(messages: NovaMessage[]) {
 }
 
 function App() {
+  const [
+    config,
+    setConfig,
+  ] = useState<NovaWidgetConfig | null>(null);
+
+  const [
+    configError,
+    setConfigError,
+  ] = useState<string | null>(null);
+
   const [
     isOpen,
     setIsOpen,
@@ -97,13 +109,7 @@ function App() {
   const socketRef =
     useRef<ReturnType<typeof connectNovaSocket> | null>(null);
 
-  const initializedRef =
-    useRef(false);
-
   const initializingRef =
-    useRef(false);
-
-  const mountedRef =
     useRef(false);
 
   const addMessage = useCallback(
@@ -150,6 +156,62 @@ function App() {
     [],
   );
 
+  /*
+   * Cargamos únicamente la configuración
+   * pública al cargar la página.
+   *
+   * Esto NO crea Visitor ni conversación.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConfig() {
+      try {
+        const novaConfig =
+          await getNovaConfig();
+
+        if (cancelled) {
+          return;
+        }
+
+        setConfig(novaConfig);
+        setConfigError(null);
+      } catch (err) {
+        console.error(
+          'Error cargando configuración Nova:',
+          err,
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        setConfigError(
+          err instanceof Error
+            ? err.message
+            : 'Widget no disponible',
+        );
+      }
+    }
+
+    void loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /*
+   * Desconectamos Socket únicamente cuando
+   * el componente realmente se desmonta.
+   */
+  useEffect(() => {
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -158,7 +220,10 @@ function App() {
     messagesEndRef.current?.scrollIntoView({
       behavior: 'smooth',
     });
-  }, [messages, isOpen]);
+  }, [
+    messages,
+    isOpen,
+  ]);
 
   useEffect(() => {
     if (!imagePreview) {
@@ -166,40 +231,16 @@ function App() {
     }
 
     return () => {
-      URL.revokeObjectURL(imagePreview);
+      URL.revokeObjectURL(
+        imagePreview,
+      );
     };
   }, [imagePreview]);
 
-  /*
-   * Importante para React StrictMode.
-   *
-   * En desarrollo React puede ejecutar:
-   *
-   * setup → cleanup → setup
-   *
-   * Por eso debemos volver a marcar
-   * mountedRef como true en cada setup.
-   */
-  useEffect(() => {
-    mountedRef.current = true;
-
-    return () => {
-      mountedRef.current = false;
-
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, []);
-
-  /*
-   * Inicializamos Nova únicamente cuando
-   * el visitante abre el widget por
-   * primera vez.
-   */
-  useEffect(() => {
+  async function initializeNovaSession() {
     if (
-      !isOpen ||
-      initializedRef.current ||
+      session ||
+      socketRef.current ||
       initializingRef.current
     ) {
       return;
@@ -207,112 +248,113 @@ function App() {
 
     initializingRef.current = true;
 
-    setConnectionStatus('Conectando...');
-    setError(null);
+    try {
+      setConnectionStatus(
+        'Conectando...',
+      );
 
-    async function initialize() {
-      try {
-        const novaSession =
-          await getNovaSession();
+      setError(null);
 
-        if (!mountedRef.current) {
-          return;
-        }
+      const novaSession =
+        await getNovaSession();
 
-        setSession(novaSession);
+      setSession(
+        novaSession,
+      );
 
-        socketRef.current =
-          connectNovaSocket(
-            novaSession.visitorToken,
-            novaSession.conversation.id,
-            {
-              async onJoined() {
-                if (!mountedRef.current) {
-                  return;
-                }
+      socketRef.current =
+        connectNovaSocket(
+          novaSession.visitorToken,
+          novaSession.conversation.id,
+          {
+            async onJoined() {
+              setConnectionStatus(
+                'En línea',
+              );
 
-                setConnectionStatus('En línea');
-
-                try {
-                  const history =
-                    await getNovaMessages(
-                      novaSession.visitorToken,
-                      novaSession.conversation.id,
-                    );
-
-                  if (!mountedRef.current) {
-                    return;
-                  }
-
-                  mergeMessages(history);
-                } catch (err) {
-                  console.error(err);
-
-                  if (mountedRef.current) {
-                    setError(
-                      err instanceof Error
-                        ? err.message
-                        : 'No se pudo cargar el historial',
-                    );
-                  }
-                }
-              },
-
-              onMessage(message) {
-                if (mountedRef.current) {
-                  addMessage(message);
-                }
-              },
-
-              onDisconnect() {
-                if (mountedRef.current) {
-                  setConnectionStatus(
-                    'Desconectado',
+              try {
+                const history =
+                  await getNovaMessages(
+                    novaSession.visitorToken,
+                    novaSession.conversation.id,
                   );
-                }
-              },
 
-              onError(message) {
-                if (mountedRef.current) {
-                  setError(message);
-                }
-              },
+                mergeMessages(
+                  history,
+                );
+              } catch (err) {
+                console.error(
+                  err,
+                );
+
+                setError(
+                  err instanceof Error
+                    ? err.message
+                    : 'No se pudo cargar el historial',
+                );
+              }
             },
-          );
 
-        initializedRef.current = true;
-      } catch (err) {
-        console.error(err);
+            onMessage(message) {
+              addMessage(
+                message,
+              );
+            },
 
-        initializedRef.current = false;
+            onDisconnect() {
+              setConnectionStatus(
+                'Desconectado',
+              );
+            },
 
-        if (mountedRef.current) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : 'Error al iniciar Nova',
-          );
+            onError(message) {
+              setError(
+                message,
+              );
+            },
+          },
+        );
+    } catch (err) {
+      console.error(
+        err,
+      );
 
-          setConnectionStatus('Error');
-        }
-      } finally {
-        initializingRef.current = false;
-      }
+      setConnectionStatus(
+        'Error',
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Error al iniciar Nova',
+      );
+    } finally {
+      initializingRef.current = false;
     }
+  }
 
-    void initialize();
-  }, [
-    isOpen,
-    addMessage,
-    mergeMessages,
-  ]);
+  function handleOpenWidget() {
+    setIsOpen(
+      true,
+    );
+
+    void initializeNovaSession();
+  }
 
   function clearSelectedImage() {
-    setSelectedImage(null);
-    setImagePreview(null);
+    setSelectedImage(
+      null,
+    );
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    setImagePreview(
+      null,
+    );
+
+    if (
+      fileInputRef.current
+    ) {
+      fileInputRef.current.value =
+        '';
     }
   }
 
@@ -337,12 +379,17 @@ function App() {
       'image/gif',
     ];
 
-    if (!allowedTypes.includes(file.type)) {
+    if (
+      !allowedTypes.includes(
+        file.type,
+      )
+    ) {
       setError(
         'Formato no permitido. Usa JPG, PNG, WEBP o GIF.',
       );
 
-      event.target.value = '';
+      event.target.value =
+        '';
 
       return;
     }
@@ -350,23 +397,33 @@ function App() {
     const maxSize =
       5 * 1024 * 1024;
 
-    if (file.size > maxSize) {
+    if (
+      file.size >
+      maxSize
+    ) {
       setError(
         'La imagen no puede superar los 5 MB.',
       );
 
-      event.target.value = '';
+      event.target.value =
+        '';
 
       return;
     }
 
-    setSelectedImage(file);
-
-    setImagePreview(
-      URL.createObjectURL(file),
+    setSelectedImage(
+      file,
     );
 
-    setError(null);
+    setImagePreview(
+      URL.createObjectURL(
+        file,
+      ),
+    );
+
+    setError(
+      null,
+    );
   }
 
   async function handleSubmit(
@@ -392,8 +449,13 @@ function App() {
     }
 
     try {
-      setSending(true);
-      setError(null);
+      setSending(
+        true,
+      );
+
+      setError(
+        null,
+      );
 
       let message: NovaMessage;
 
@@ -416,11 +478,17 @@ function App() {
           );
       }
 
-      addMessage(message);
+      addMessage(
+        message,
+      );
 
-      setInput('');
+      setInput(
+        '',
+      );
     } catch (err) {
-      console.error(err);
+      console.error(
+        err,
+      );
 
       setError(
         err instanceof Error
@@ -428,30 +496,52 @@ function App() {
           : 'No se pudo enviar el mensaje',
       );
     } finally {
-      setSending(false);
+      setSending(
+        false,
+      );
     }
   }
 
+  if (
+    !config &&
+    configError
+  ) {
+    return null;
+  }
+
+  if (!config) {
+    return null;
+  }
+
+  const positionClass =
+    config.position === 'LEFT'
+      ? 'nova-widget-shell--left'
+      : 'nova-widget-shell--right';
+
   return (
-    <div className="nova-widget-shell">
+    <div
+      className={`nova-widget-shell ${positionClass}`}
+    >
       {isOpen && (
         <section
           className="nova-chat"
-          aria-label="Chat de soporte Nova"
+          aria-label={`Chat de soporte ${config.title}`}
         >
           <header className="nova-chat__header">
             <div className="nova-chat__identity">
               <div className="nova-chat__avatar">
-                N
+                {config.title
+                  .charAt(0)
+                  .toUpperCase()}
               </div>
 
               <div>
                 <h1>
-                  Nova
+                  {config.title}
                 </h1>
 
                 <p>
-                  Soporte en línea
+                  {config.subtitle}
                 </p>
               </div>
             </div>
@@ -465,7 +555,9 @@ function App() {
                 type="button"
                 className="nova-chat__close"
                 onClick={() => {
-                  setIsOpen(false);
+                  setIsOpen(
+                    false,
+                  );
                 }}
                 aria-label="Minimizar chat"
                 title="Minimizar"
@@ -477,47 +569,57 @@ function App() {
 
           <div className="nova-chat__messages">
             <div className="nova-message nova-message--system">
-              Hola 👋 ¿En qué podemos ayudarte?
+              {config.welcomeMessage}
             </div>
 
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={
-                  message.senderType === 'VISITOR'
-                    ? 'nova-message nova-message--visitor'
-                    : 'nova-message nova-message--agent'
-                }
-              >
-                {message.type === 'IMAGE' ? (
-                  <>
-                    {message.mediaUrl && (
-                      <img
-                        src={`${NOVA_API_URL}${message.mediaUrl}`}
-                        alt="Imagen enviada"
-                        className="nova-message__image"
-                      />
-                    )}
+            {messages.map(
+              (message) => (
+                <div
+                  key={
+                    message.id
+                  }
+                  className={
+                    message.senderType ===
+                    'VISITOR'
+                      ? 'nova-message nova-message--visitor'
+                      : 'nova-message nova-message--agent'
+                  }
+                >
+                  {message.type ===
+                  'IMAGE' ? (
+                    <>
+                      {message.mediaUrl && (
+                        <img
+                          src={`${NOVA_API_URL}${message.mediaUrl}`}
+                          alt="Imagen enviada"
+                          className="nova-message__image"
+                        />
+                      )}
 
-                    {message.content && (
-                      <div className="nova-message__content">
-                        {message.content}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="nova-message__content">
-                    {message.content}
-                  </div>
-                )}
-
-                <div className="nova-message__time">
-                  {formatMessageTime(
-                    message.createdAt,
+                      {message.content && (
+                        <div className="nova-message__content">
+                          {
+                            message.content
+                          }
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="nova-message__content">
+                      {
+                        message.content
+                      }
+                    </div>
                   )}
+
+                  <div className="nova-message__time">
+                    {formatMessageTime(
+                      message.createdAt,
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ),
+            )}
 
             {error && (
               <div className="nova-message nova-message--error">
@@ -525,14 +627,20 @@ function App() {
               </div>
             )}
 
-            <div ref={messagesEndRef} />
+            <div
+              ref={
+                messagesEndRef
+              }
+            />
           </div>
 
           {imagePreview && (
             <div className="nova-image-preview">
               <div className="nova-image-preview__container">
                 <img
-                  src={imagePreview}
+                  src={
+                    imagePreview
+                  }
                   alt="Vista previa"
                   className="nova-image-preview__image"
                 />
@@ -540,7 +648,9 @@ function App() {
                 <button
                   type="button"
                   className="nova-image-preview__remove"
-                  onClick={clearSelectedImage}
+                  onClick={
+                    clearSelectedImage
+                  }
                   aria-label="Quitar imagen"
                   title="Quitar imagen"
                 >
@@ -562,20 +672,28 @@ function App() {
 
           <form
             className="nova-chat__composer"
-            onSubmit={handleSubmit}
+            onSubmit={
+              handleSubmit
+            }
           >
             <input
-              ref={fileInputRef}
+              ref={
+                fileInputRef
+              }
               className="nova-chat__file-input"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handleImageSelected}
+              onChange={
+                handleImageSelected
+              }
             />
 
             <button
               type="button"
               className="nova-chat__attach"
-              onClick={openFilePicker}
+              onClick={
+                openFilePicker
+              }
               disabled={
                 !session ||
                 sending
@@ -588,10 +706,16 @@ function App() {
 
             <input
               type="text"
-              value={input}
-              onChange={(event) => {
-                setInput(event.target.value);
-              }}
+              value={
+                input
+              }
+              onChange={
+                (event) => {
+                  setInput(
+                    event.target.value,
+                  );
+                }
+              }
               placeholder={
                 selectedImage
                   ? 'Añade un mensaje...'
@@ -627,10 +751,10 @@ function App() {
         <button
           type="button"
           className="nova-launcher"
-          onClick={() => {
-            setIsOpen(true);
-          }}
-          aria-label="Abrir chat de soporte"
+          onClick={
+            handleOpenWidget
+          }
+          aria-label={`Abrir chat de ${config.title}`}
           title="Abrir chat"
         >
           <span className="nova-launcher__icon">

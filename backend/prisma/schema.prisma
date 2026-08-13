@@ -17,6 +17,11 @@ enum UserRole {
   AGENT
 }
 
+enum WidgetPosition {
+  LEFT
+  RIGHT
+}
+
 enum UserStatus {
   ACTIVE
   INACTIVE
@@ -44,12 +49,17 @@ enum MessageSenderType {
 }
 
 model Workspace {
-  id        String   @id @default(uuid()) @db.Uuid
-  name      String
-  slug      String   @unique
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String         @id @default(uuid()) @db.Uuid
+  name                 String
+  slug                 String         @unique
+  status               String         @default("ACTIVE")
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  widgetTitle          String         @default("Nova")
+  widgetSubtitle       String         @default("Soporte en línea")
+  widgetWelcomeMessage String         @default("Hola 👋 ¿En qué podemos ayudarte?")
+  widgetPosition       WidgetPosition @default(RIGHT)
+  widgetEnabled        Boolean        @default(true)
 
   users         User[]
   visitors      Visitor[]
