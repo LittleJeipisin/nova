@@ -24,6 +24,10 @@ import {
   LoginPage,
 } from './pages/LoginPage';
 
+import {
+  AdminPage,
+} from './pages/AdminPage';
+
 function App() {
   const [
     user,
@@ -184,6 +188,19 @@ function App() {
       />
     );
   }
+  if (
+  user.role === 'OWNER' ||
+  user.role === 'ADMIN'
+) {
+  return (
+    <AdminPage
+      user={user}
+      onLogout={
+        handleLogout
+      }
+    />
+  );
+}
 
   return (
     <main className="nova-dashboard">

@@ -11,6 +11,15 @@ const workspaceParam = new URLSearchParams(
 export const NOVA_WORKSPACE_SLUG =
   workspaceParam ?? '';
 
+const siteParam = new URLSearchParams(
+  window.location.search,
+)
+  .get('site')
+  ?.trim();
+
+export const NOVA_SITE_SLUG =
+  siteParam ?? '';
+
 export type NovaWidgetPosition =
   | 'LEFT'
   | 'RIGHT';
@@ -20,6 +29,12 @@ export type NovaWidgetConfig = {
   subtitle: string;
   welcomeMessage: string;
   position: NovaWidgetPosition;
+
+  site: {
+    id: string;
+    name: string;
+    slug: string;
+  };
 };
 
 export type NovaConversation = {
@@ -29,6 +44,7 @@ export type NovaConversation = {
     | 'PENDING'
     | 'CLOSED';
   workspaceId: string;
+  siteId: string | null;
   visitorId: string;
   assignedAgentId: string | null;
   createdAt: string;
@@ -59,6 +75,7 @@ type CreateVisitorResponse = {
   visitor: {
     id: string;
     workspaceId: string;
+    siteId: string;
     createdAt: string;
     updatedAt: string;
     lastSeenAt: string;
@@ -116,8 +133,24 @@ function getEncodedWorkspaceSlug() {
   );
 }
 
+function getSiteSlug() {
+  if (!NOVA_SITE_SLUG) {
+    throw new Error(
+      'Falta el parámetro ?site= en la URL',
+    );
+  }
+
+  return NOVA_SITE_SLUG;
+}
+
+function getEncodedSiteSlug() {
+  return encodeURIComponent(
+    getSiteSlug(),
+  );
+}
+
 function getVisitorTokenKey() {
-  return `nova:visitorToken:${getWorkspaceSlug()}`;
+  return `nova:visitorToken:${getWorkspaceSlug()}:${getSiteSlug()}`;
 }
 
 function getStoredVisitorToken() {
@@ -136,9 +169,12 @@ async function loadNovaConfig() {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
 
+  const siteSlug =
+    getEncodedSiteSlug();
+
   const response =
     await fetch(
-      `${NOVA_API_URL}/widget/${workspaceSlug}/config`,
+      `${NOVA_API_URL}/widget/${workspaceSlug}/config?site=${siteSlug}`,
       {
         method: 'GET',
       },
@@ -178,11 +214,24 @@ async function createVisitor() {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
 
+  const siteSlug =
+    getSiteSlug();
+
   const response =
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/visitors`,
       {
         method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body:
+          JSON.stringify({
+            site: siteSlug,
+          }),
       },
     );
 

@@ -16,35 +16,31 @@ import { WorkspaceGuard } from '../auth/guards/workspace.guards';
 import { Roles } from '../auth/decorators/roles.decorators';
 import { PasswordChangedGuard } from '../auth/guards/password.guards';
 
+type AuthenticatedRequest = {
+  user: {
+    userId: string;
+    role: string;
+    workspaceId: string | null;
+    ownerType?: string | null;
+  };
+};
+
 @Controller('workspaces')
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Post(':workspaceId/owners')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
   async createOwner(
     @Param('workspaceId') workspaceId: string,
     @Body('username') username: string,
   ) {
-    return this.usersService.createOwner(
-      workspaceId,
-      username,
-    );
+    return this.usersService.createOwner(workspaceId, username);
   }
 
   @Post(':workspaceId/temporary-owners')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard)
   @Roles('PLATFORM_ADMIN')
   async createTemporaryOwner(
     @Param('workspaceId') workspaceId: string,
@@ -59,134 +55,73 @@ export class UsersController {
   }
 
   @Post(':workspaceId/admins')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
   @Roles('OWNER')
   async createAdmin(
     @Param('workspaceId') workspaceId: string,
     @Body('username') username: string,
-    @Req() request: any,
+    @Body('siteId') siteId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.usersService.createAdmin(
       workspaceId,
       username,
+      siteId,
       request.user,
     );
   }
 
   @Post(':workspaceId/agents')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
   @Roles('ADMIN')
   async createAgent(
     @Param('workspaceId') workspaceId: string,
     @Body('username') username: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.usersService.createAgent(
-      workspaceId,
-      username,
-    );
+    return this.usersService.createAgent(workspaceId, username, request.user);
   }
 
   @Get(':workspaceId/users')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
-  @Roles(
-    'PLATFORM_ADMIN',
-    'OWNER',
-    'ADMIN',
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
+  @Roles('PLATFORM_ADMIN', 'OWNER', 'ADMIN')
   async findAll(
     @Param('workspaceId') workspaceId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.usersService.findAll(
-      workspaceId,
-    );
+    return this.usersService.findAll(workspaceId, request.user);
   }
 
   @Get(':workspaceId/users/:userId')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
-  @Roles(
-    'PLATFORM_ADMIN',
-    'OWNER',
-    'ADMIN',
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
+  @Roles('PLATFORM_ADMIN', 'OWNER', 'ADMIN')
   async findOne(
     @Param('workspaceId') workspaceId: string,
     @Param('userId') userId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.usersService.findOne(
-      workspaceId,
-      userId,
-    );
+    return this.usersService.findOne(workspaceId, userId, request.user);
   }
 
-  @Patch(
-    ':workspaceId/users/:userId/deactivate',
-  )
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
-  @Roles(
-    'PLATFORM_ADMIN',
-    'OWNER',
-    'ADMIN',
-  )
+  @Patch(':workspaceId/users/:userId/deactivate')
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
+  @Roles('PLATFORM_ADMIN', 'OWNER', 'ADMIN')
   async deactivate(
     @Param('workspaceId') workspaceId: string,
     @Param('userId') userId: string,
-    @Req() request: any,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.usersService.deactivate(
-      workspaceId,
-      userId,
-      request.user,
-    );
+    return this.usersService.deactivate(workspaceId, userId, request.user);
   }
 
-  @Patch(
-    ':workspaceId/users/:userId/activate',
-  )
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
-  @Roles(
-    'PLATFORM_ADMIN',
-    'OWNER',
-    'ADMIN',
-  )
+  @Patch(':workspaceId/users/:userId/activate')
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
+  @Roles('PLATFORM_ADMIN', 'OWNER', 'ADMIN')
   async activate(
     @Param('workspaceId') workspaceId: string,
     @Param('userId') userId: string,
-    @Req() request: any,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.usersService.activate(
-      workspaceId,
-      userId,
-      request.user,
-    );
+    return this.usersService.activate(workspaceId, userId, request.user);
   }
 }

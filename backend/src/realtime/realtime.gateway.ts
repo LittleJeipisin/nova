@@ -82,11 +82,53 @@ export class RealtimeGateway {
 
     const visitorId = this.getVerifiedVisitorId(verifiedVisitor);
 
+    /*
+     * No confiamos en que el token por sí solo
+     * nos entregue la página actual.
+     *
+     * Volvemos a DB para comprobar:
+     *
+     * - mismo Workspace;
+     * - siteId presente;
+     * - Site ACTIVE.
+     */
+    const visitor = await this.prisma.visitor.findFirst({
+      where: {
+        id: visitorId,
+        workspaceId: workspace.id,
+      },
+
+      select: {
+        id: true,
+        siteId: true,
+      },
+    });
+
+    if (!visitor || !visitor.siteId) {
+      throw new WsException('Visitante sin página asignada');
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: visitor.siteId,
+        workspaceId: workspace.id,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new WsException('La página no está disponible');
+    }
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: data.conversationId,
+
         workspaceId: workspace.id,
-        visitorId,
+
+        siteId: site.id,
+
+        visitorId: visitor.id,
 
         status: {
           in: ['OPEN', 'PENDING'],
@@ -106,7 +148,7 @@ export class RealtimeGateway {
 
     await this.prisma.visitor.update({
       where: {
-        id: visitorId,
+        id: visitor.id,
       },
 
       data: {
@@ -128,22 +170,14 @@ export class RealtimeGateway {
    * AGENT -> CONVERSACIÓN
    * =========================================================
    *
-   * IMPORTANTE:
-   *
-   * El AGENT ya NO entra en:
+   * El AGENT NO entra en:
    *
    * conversation:{conversationId}
    *
-   * Los mensajes internos se distribuyen mediante:
+   * Los mensajes internos se distribuyen por:
    *
    * user:{userId}
-   * workspace:{workspaceId}:unassigned
-   *
-   * Conservamos este evento temporalmente porque
-   * el frontend actual todavía lo envía.
-   *
-   * Únicamente validamos que el AGENT pueda ver
-   * la conversación y devolvemos confirmación.
+   * site:{siteId}:unassigned
    */
   @SubscribeMessage('conversation:join:agent')
   async joinAgentConversation(
@@ -166,20 +200,17 @@ export class RealtimeGateway {
       throw new WsException('No tienes acceso a este workspace');
     }
 
-    /*
-     * Puede visualizar:
-     *
-     * - conversación sin asignar;
-     * - conversación asignada a él.
-     *
-     * No puede visualizar una conversación
-     * perteneciente a otro agente.
-     */
+    if (!user.siteId) {
+      throw new WsException('Agente sin página asignada');
+    }
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: data.conversationId,
 
         workspaceId: data.workspaceId,
+
+        siteId: user.siteId,
 
         OR: [
           {
@@ -201,17 +232,12 @@ export class RealtimeGateway {
     }
 
     /*
-     * NO hacemos:
+     * NO hacemos join a conversation:{id}.
      *
-     * client.join(
-     *   `conversation:${conversation.id}`,
-     * );
-     *
-     * Esto evita que un agente conserve
-     * acceso realtime después de que
-     * la conversación sea tomada o reasignada.
+     * Así un Agent no conserva acceso
+     * realtime después de una toma o
+     * reasignación.
      */
-
     return {
       event: 'conversation:joined',
 
@@ -255,7 +281,9 @@ export class RealtimeGateway {
      * a cualquier Workspace.
      */
     if (user.role === 'PLATFORM_ADMIN') {
-      await client.join(`workspace:${workspace.id}`);
+      const room = `workspace:${workspace.id}`;
+
+      await client.join(room);
 
       return {
         event: 'workspace:joined',
@@ -263,7 +291,7 @@ export class RealtimeGateway {
         data: {
           workspaceId: workspace.id,
 
-          room: `workspace:${workspace.id}`,
+          room,
 
           role: user.role,
         },
@@ -283,29 +311,86 @@ export class RealtimeGateway {
     }
 
     /*
-     * AGENT entra en DOS rooms:
-     *
-     * user:{userId}
-     *
-     *   Conversaciones asignadas
-     *   específicamente a él.
-     *
-     * workspace:{workspaceId}:unassigned
-     *
-     *   Conversaciones todavía
-     *   sin asignar.
-     *
-     * Nunca entra en la room general:
+     * OWNER:
      *
      * workspace:{workspaceId}
      *
-     * porque puede contener información
-     * de conversaciones de otros agentes.
+     * Recibe todas las páginas de
+     * su empresa.
+     */
+    if (user.role === 'OWNER') {
+      const room = `workspace:${workspace.id}`;
+
+      await client.join(room);
+
+      return {
+        event: 'workspace:joined',
+
+        data: {
+          workspaceId: workspace.id,
+
+          room,
+
+          role: user.role,
+        },
+      };
+    }
+
+    /*
+     * ADMIN:
+     *
+     * site:{siteId}
+     *
+     * Nunca entra en la room general
+     * del Workspace.
+     */
+    if (user.role === 'ADMIN') {
+      if (!user.siteId) {
+        throw new WsException('Administrador sin página asignada');
+      }
+
+      const room = `site:${user.siteId}`;
+
+      await client.join(room);
+
+      return {
+        event: 'workspace:joined',
+
+        data: {
+          workspaceId: workspace.id,
+
+          siteId: user.siteId,
+
+          room,
+
+          role: user.role,
+        },
+      };
+    }
+
+    /*
+     * AGENT entra en DOS rooms:
+     *
+     * user:{userId}
+     *   conversaciones asignadas a él.
+     *
+     * site:{siteId}:unassigned
+     *   conversaciones sin asignar
+     *   solamente de su página.
+     *
+     * Nunca entra en:
+     *
+     * workspace:{workspaceId}
+     * site:{siteId}
      */
     if (user.role === 'AGENT') {
+      if (!user.siteId) {
+        throw new WsException('Agente sin página asignada');
+      }
+
       const userRoom = `user:${user.id}`;
 
-      const unassignedRoom = `workspace:${workspace.id}:unassigned`;
+      const unassignedRoom = `site:${user.siteId}:unassigned`;
 
       await client.join(userRoom);
 
@@ -317,29 +402,11 @@ export class RealtimeGateway {
         data: {
           workspaceId: workspace.id,
 
+          siteId: user.siteId,
+
           room: userRoom,
 
           unassignedRoom,
-
-          role: user.role,
-        },
-      };
-    }
-
-    /*
-     * OWNER y ADMIN reciben
-     * la bandeja general.
-     */
-    if (user.role === 'OWNER' || user.role === 'ADMIN') {
-      await client.join(`workspace:${workspace.id}`);
-
-      return {
-        event: 'workspace:joined',
-
-        data: {
-          workspaceId: workspace.id,
-
-          room: `workspace:${workspace.id}`,
 
           role: user.role,
         },
@@ -380,6 +447,7 @@ export class RealtimeGateway {
 
       include: {
         workspace: true,
+        site: true,
       },
     });
 
@@ -406,6 +474,26 @@ export class RealtimeGateway {
 
       if (user.workspace.status !== 'ACTIVE') {
         throw new WsException('El workspace está inactivo');
+      }
+    }
+
+    /*
+     * ADMIN y AGENT deben pertenecer
+     * a un Site activo del mismo Workspace.
+     */
+    if (user.role === 'ADMIN' || user.role === 'AGENT') {
+      if (!user.siteId || !user.site) {
+        throw new WsException('Usuario sin página asignada');
+      }
+
+      if (user.site.workspaceId !== user.workspaceId) {
+        throw new WsException(
+          'La página no pertenece al workspace del usuario',
+        );
+      }
+
+      if (user.site.status !== 'ACTIVE') {
+        throw new WsException('La página está inactiva');
       }
     }
 
@@ -513,21 +601,48 @@ export class RealtimeGateway {
    */
 
   /*
-   * Esta room queda reservada para
-   * sockets del Visitor.
+   * Room exclusiva del Visitor.
    */
   emitToConversation(conversationId: string, event: string, data: unknown) {
     this.server.to(`conversation:${conversationId}`).emit(event, data);
   }
 
+  /*
+   * OWNER / PLATFORM_ADMIN.
+   */
   emitToWorkspace(workspaceId: string, event: string, data: unknown) {
     this.server.to(`workspace:${workspaceId}`).emit(event, data);
   }
 
-  emitToUnassigned(workspaceId: string, event: string, data: unknown) {
-    this.server.to(`workspace:${workspaceId}:unassigned`).emit(event, data);
+  /*
+   * ADMIN.
+   */
+  emitToSite(siteId: string, event: string, data: unknown) {
+    this.server.to(`site:${siteId}`).emit(event, data);
   }
 
+  /*
+   * AGENT - conversaciones sin asignar
+   * únicamente de su página.
+   */
+  emitToSiteUnassigned(siteId: string, event: string, data: unknown) {
+    this.server.to(`site:${siteId}:unassigned`).emit(event, data);
+  }
+
+  /*
+   * Alias seguro para código que todavía
+   * utilice el nombre anterior.
+   *
+   * El argumento ahora representa siteId,
+   * NO workspaceId.
+   */
+  emitToUnassigned(siteId: string, event: string, data: unknown) {
+    this.emitToSiteUnassigned(siteId, event, data);
+  }
+
+  /*
+   * AGENT privado.
+   */
   emitToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event, data);
   }

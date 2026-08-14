@@ -15,6 +15,7 @@ type ConversationStatusValue = 'OPEN' | 'PENDING' | 'CLOSED';
 
 type ConversationWhereFilter = {
   workspaceId: string;
+  siteId?: string;
   OR?: Array<{
     assignedAgentId: string | null;
   }>;
@@ -33,6 +34,69 @@ export class ConversationsService {
     private readonly realtimeService: RealtimeService,
     private readonly visitorsService: VisitorsService,
   ) {}
+
+  private async getRequesterSiteId(
+    workspaceId: string,
+    requester: ConversationRequester,
+  ) {
+    if (requester.role !== 'ADMIN' && requester.role !== 'AGENT') {
+      return null;
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: requester.userId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!user || user.role !== requester.role) {
+      throw new ForbiddenException('Usuario no autorizado');
+    }
+
+    if (!user.siteId) {
+      throw new ForbiddenException('El usuario no tiene una página asignada');
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: user.siteId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new ForbiddenException('La página del usuario no está disponible');
+    }
+
+    return site.id;
+  }
+
+  private async ensureActiveSite(workspaceId: string, siteId: string | null) {
+    if (!siteId) {
+      throw new BadRequestException(
+        'La conversación no tiene una página asignada',
+      );
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: siteId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new BadRequestException(
+        'La página de la conversación no está disponible',
+      );
+    }
+
+    return site;
+  }
 
   async create(workspaceSlug: string, visitorToken: string | undefined) {
     const workspace = await this.prisma.workspace.findUnique({
@@ -54,17 +118,23 @@ export class ConversationsService {
       workspace.id,
     );
 
+    if (!visitor.siteId) {
+      throw new BadRequestException(
+        'El visitante no tiene una página asignada',
+      );
+    }
+
+    await this.ensureActiveSite(workspace.id, visitor.siteId);
+
     const existingConversation = await this.prisma.conversation.findFirst({
       where: {
         workspaceId: workspace.id,
-
+        siteId: visitor.siteId,
         visitorId: visitor.id,
-
         status: {
           in: ['OPEN', 'PENDING'],
         },
       },
-
       orderBy: {
         createdAt: 'desc',
       },
@@ -75,8 +145,6 @@ export class ConversationsService {
     }
 
     /*
-     * IMPORTANTE:
-     *
      * Crear la Conversation NO la publica
      * todavía en realtime.
      *
@@ -89,9 +157,8 @@ export class ConversationsService {
     return this.prisma.conversation.create({
       data: {
         workspaceId: workspace.id,
-
+        siteId: visitor.siteId,
         visitorId: visitor.id,
-
         status: 'OPEN',
       },
     });
@@ -120,12 +187,19 @@ export class ConversationsService {
       workspace.id,
     );
 
+    if (!visitor.siteId) {
+      throw new BadRequestException(
+        'El visitante no tiene una página asignada',
+      );
+    }
+
+    await this.ensureActiveSite(workspace.id, visitor.siteId);
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         workspaceId: workspace.id,
-
+        siteId: visitor.siteId,
         visitorId: visitor.id,
-
         status: {
           in: ['OPEN', 'PENDING'],
         },
@@ -158,15 +232,27 @@ export class ConversationsService {
       workspaceId,
     };
 
+    const requesterSiteId = await this.getRequesterSiteId(
+      workspaceId,
+      requester,
+    );
+
     /*
-     * Un AGENT puede ver:
+     * OWNER / PLATFORM_ADMIN:
+     * todas las páginas del Workspace.
      *
-     * - conversaciones sin asignar;
-     * - conversaciones asignadas a él.
+     * ADMIN:
+     * solamente su página.
      *
-     * No puede ver conversaciones asignadas
-     * a otro AGENT.
+     * AGENT:
+     * solamente su página y además:
+     * - sin asignar;
+     * - asignadas a él.
      */
+    if (requesterSiteId) {
+      where.siteId = requesterSiteId;
+    }
+
     if (requester.role === 'AGENT') {
       where.OR = [
         {
@@ -200,9 +286,6 @@ export class ConversationsService {
          * Una conversación solamente aparece
          * en las bandejas internas cuando ya
          * existe al menos un mensaje.
-         *
-         * Esto evita chats vacíos provocados
-         * únicamente por abrir el widget.
          */
         messages: {
           some: {},
@@ -218,6 +301,7 @@ export class ConversationsService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -241,11 +325,22 @@ export class ConversationsService {
     conversationId: string,
     requester: ConversationRequester,
   ) {
+    const requesterSiteId = await this.getRequesterSiteId(
+      workspaceId,
+      requester,
+    );
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        ...(requesterSiteId
+          ? {
+              siteId: requesterSiteId,
+            }
+          : {}),
       },
+
       include: {
         visitor: true,
 
@@ -255,6 +350,7 @@ export class ConversationsService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -262,6 +358,7 @@ export class ConversationsService {
           orderBy: {
             createdAt: 'asc',
           },
+
           include: {
             senderUser: {
               select: {
@@ -279,15 +376,6 @@ export class ConversationsService {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    /*
-     * El AGENT puede abrir:
-     *
-     * - una conversación sin asignar;
-     * - una conversación asignada a él.
-     *
-     * Si pertenece a otro agente,
-     * se bloquea.
-     */
     if (
       requester.role === 'AGENT' &&
       conversation.assignedAgentId &&
@@ -303,11 +391,22 @@ export class ConversationsService {
     workspaceId: string,
     conversationId: string,
     agentId: string,
+    requester: ConversationRequester,
   ) {
+    const requesterSiteId = await this.getRequesterSiteId(
+      workspaceId,
+      requester,
+    );
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        ...(requesterSiteId
+          ? {
+              siteId: requesterSiteId,
+            }
+          : {}),
       },
     });
 
@@ -321,17 +420,22 @@ export class ConversationsService {
       );
     }
 
+    await this.ensureActiveSite(workspaceId, conversation.siteId);
+
     const agent = await this.prisma.user.findFirst({
       where: {
         id: agentId,
         workspaceId,
         role: 'AGENT',
         status: 'ACTIVE',
+        siteId: conversation.siteId,
       },
     });
 
     if (!agent) {
-      throw new NotFoundException('Agente no encontrado o no disponible');
+      throw new NotFoundException(
+        'Agente no encontrado, no disponible o pertenece a otra página',
+      );
     }
 
     const previousAgentId = conversation.assignedAgentId;
@@ -340,10 +444,12 @@ export class ConversationsService {
       where: {
         id: conversation.id,
       },
+
       data: {
         assignedAgentId: agent.id,
         updatedAt: new Date(),
       },
+
       include: {
         visitor: true,
 
@@ -353,6 +459,7 @@ export class ConversationsService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -360,24 +467,25 @@ export class ConversationsService {
           orderBy: {
             createdAt: 'desc',
           },
+
           take: 1,
         },
       },
     });
 
     /*
-     * OWNER / ADMIN / PLATFORM_ADMIN.
+     * IMPORTANTE:
+     * estas emisiones siguen usando rooms
+     * antiguas por Workspace.
+     *
+     * La separación de realtime por Site
+     * se hará en el siguiente bloque.
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       workspaceId,
       updatedConversation,
     );
 
-    /*
-     * Si estaba sin asignar y un ADMIN/OWNER
-     * acaba de asignarla, debe desaparecer de
-     * "Sin asignar" para todos los AGENT.
-     */
     if (!previousAgentId) {
       this.realtimeService.emitConversationRemovedFromUnassigned(
         workspaceId,
@@ -385,19 +493,11 @@ export class ConversationsService {
       );
     }
 
-    /*
-     * Nuevo agente asignado.
-     */
     this.realtimeService.emitConversationUpdatedToUser(
       agent.id,
       updatedConversation,
     );
 
-    /*
-     * Si hubo reasignación entre agentes,
-     * quitamos la conversación de la bandeja
-     * privada del agente anterior.
-     */
     if (previousAgentId && previousAgentId !== agent.id) {
       this.realtimeService.emitConversationRemovedFromUser(
         previousAgentId,
@@ -409,39 +509,35 @@ export class ConversationsService {
   }
 
   async claim(workspaceId: string, conversationId: string, userId: string) {
-    const agent = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        workspaceId,
-        role: 'AGENT',
-        status: 'ACTIVE',
-      },
+    const agentSiteId = await this.getRequesterSiteId(workspaceId, {
+      userId,
+      role: 'AGENT',
     });
 
-    if (!agent) {
+    if (!agentSiteId) {
       throw new UnauthorizedException('Agente no autorizado');
     }
 
     /*
-     * El updateMany actúa como una toma atómica.
+     * Toma atómica.
      *
-     * Solo puede actualizar si la conversación
-     * todavía tiene assignedAgentId = null.
-     *
-     * Si dos agentes pulsan "Tomar" al mismo
-     * tiempo, solo uno obtiene count = 1.
+     * Además de assignedAgentId = null,
+     * exigimos que la conversación
+     * pertenezca al mismo Site.
      */
     const claimed = await this.prisma.conversation.updateMany({
       where: {
         id: conversationId,
         workspaceId,
+        siteId: agentSiteId,
         assignedAgentId: null,
         status: {
           in: ['OPEN', 'PENDING'],
         },
       },
+
       data: {
-        assignedAgentId: agent.id,
+        assignedAgentId: userId,
         updatedAt: new Date(),
       },
     });
@@ -451,6 +547,7 @@ export class ConversationsService {
         where: {
           id: conversationId,
           workspaceId,
+          siteId: agentSiteId,
         },
       });
 
@@ -466,9 +563,9 @@ export class ConversationsService {
        * Si el mismo agente ya la tomó,
        * hacemos el endpoint idempotente.
        */
-      if (conversation.assignedAgentId === agent.id) {
+      if (conversation.assignedAgentId === userId) {
         return this.findOneForWorkspace(workspaceId, conversationId, {
-          userId: agent.id,
+          userId,
           role: 'AGENT',
         });
       }
@@ -482,8 +579,10 @@ export class ConversationsService {
       where: {
         id: conversationId,
         workspaceId,
-        assignedAgentId: agent.id,
+        siteId: agentSiteId,
+        assignedAgentId: userId,
       },
+
       include: {
         visitor: true,
 
@@ -493,6 +592,7 @@ export class ConversationsService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -500,6 +600,7 @@ export class ConversationsService {
           orderBy: {
             createdAt: 'desc',
           },
+
           take: 1,
         },
       },
@@ -510,31 +611,21 @@ export class ConversationsService {
     }
 
     /*
-     * OWNER / ADMIN reciben la actualización
-     * normal del Workspace.
+     * Realtime todavía será migrado
+     * a rooms por Site en el siguiente bloque.
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       workspaceId,
       updatedConversation,
     );
 
-    /*
-     * Ya dejó de estar sin asignar.
-     *
-     * Todos los agentes deben quitarla
-     * de su bandeja "Sin asignar".
-     */
     this.realtimeService.emitConversationRemovedFromUnassigned(
       workspaceId,
       conversationId,
     );
 
-    /*
-     * El agente que consiguió tomarla
-     * la recibe en su room privada.
-     */
     this.realtimeService.emitConversationUpdatedToUser(
-      agent.id,
+      userId,
       updatedConversation,
     );
 
@@ -542,10 +633,20 @@ export class ConversationsService {
   }
 
   async close(workspaceId: string, conversationId: string, userId: string) {
+    const agentSiteId = await this.getRequesterSiteId(workspaceId, {
+      userId,
+      role: 'AGENT',
+    });
+
+    if (!agentSiteId) {
+      throw new BadRequestException('Agente no válido');
+    }
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        siteId: agentSiteId,
       },
     });
 
@@ -557,20 +658,7 @@ export class ConversationsService {
       throw new BadRequestException('La conversación ya está cerrada');
     }
 
-    const agent = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        workspaceId,
-        role: 'AGENT',
-        status: 'ACTIVE',
-      },
-    });
-
-    if (!agent) {
-      throw new BadRequestException('Agente no válido');
-    }
-
-    if (conversation.assignedAgentId !== agent.id) {
+    if (conversation.assignedAgentId !== userId) {
       throw new BadRequestException(
         'Solo el agente asignado puede cerrar la conversación',
       );
@@ -580,6 +668,7 @@ export class ConversationsService {
       where: {
         id: conversation.id,
       },
+
       data: {
         status: 'CLOSED',
         closedAt: new Date(),
@@ -606,10 +695,20 @@ export class ConversationsService {
       );
     }
 
+    const agentSiteId = await this.getRequesterSiteId(workspaceId, {
+      userId,
+      role: 'AGENT',
+    });
+
+    if (!agentSiteId) {
+      throw new ForbiddenException('Agente no autorizado');
+    }
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        siteId: agentSiteId,
       },
     });
 
@@ -633,6 +732,7 @@ export class ConversationsService {
       where: {
         id: conversation.id,
       },
+
       data: {
         status: normalizedStatus,
         updatedAt: new Date(),
@@ -649,6 +749,7 @@ export class ConversationsService {
       where: {
         id: conversationId,
       },
+
       include: {
         visitor: true,
 
@@ -658,6 +759,7 @@ export class ConversationsService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -665,6 +767,7 @@ export class ConversationsService {
           orderBy: {
             createdAt: 'desc',
           },
+
           take: 1,
         },
       },
@@ -675,22 +778,18 @@ export class ConversationsService {
     }
 
     /*
-     * OWNER / ADMIN / PLATFORM_ADMIN.
+     * Realtime aún utiliza la infraestructura
+     * anterior por Workspace.
+     *
+     * No consideraremos terminado el aislamiento
+     * multi-Site hasta modificar RealtimeService
+     * y RealtimeGateway.
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       conversation.workspaceId,
       conversation,
     );
 
-    /*
-     * Si está asignada:
-     * actualizamos la bandeja privada
-     * del agente correspondiente.
-     *
-     * Si NO está asignada:
-     * actualizamos la bandeja compartida
-     * de conversaciones sin asignar.
-     */
     if (conversation.assignedAgentId) {
       this.realtimeService.emitConversationUpdatedToUser(
         conversation.assignedAgentId,

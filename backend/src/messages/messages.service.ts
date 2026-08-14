@@ -1,17 +1,18 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 
-import { PrismaService } from '../prisma/prisma.service';
-import { RealtimeService } from '../realtime/realtime.service';
-import { VisitorsService } from '../visitors/visitors.service';
-
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { RealtimeService } from '../realtime/realtime.service';
+import { VisitorsService } from '../visitors/visitors.service';
 
 @Injectable()
 export class MessagesService {
@@ -21,9 +22,8 @@ export class MessagesService {
     private readonly visitorsService: VisitorsService,
   ) {}
 
-  async getVisitorMessages(
+  private async getVisitorContext(
     workspaceSlug: string,
-    conversationId: string,
     visitorToken: string | undefined,
   ) {
     const workspace = await this.prisma.workspace.findUnique({
@@ -45,10 +45,82 @@ export class MessagesService {
       workspace.id,
     );
 
+    if (!visitor.siteId) {
+      throw new ForbiddenException('El visitante no tiene una página asignada');
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: visitor.siteId,
+        workspaceId: workspace.id,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new ForbiddenException(
+        'La página del visitante no está disponible',
+      );
+    }
+
+    return {
+      workspace,
+      visitor,
+      site,
+    };
+  }
+
+  private async getAgentContext(workspaceId: string, userId: string) {
+    const agent = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        workspaceId,
+        role: 'AGENT',
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!agent) {
+      throw new UnauthorizedException('Agente no autorizado');
+    }
+
+    if (!agent.siteId) {
+      throw new ForbiddenException('El agente no tiene una página asignada');
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: agent.siteId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new ForbiddenException('La página del agente no está disponible');
+    }
+
+    return {
+      agent,
+      site,
+    };
+  }
+
+  async getVisitorMessages(
+    workspaceSlug: string,
+    conversationId: string,
+    visitorToken: string | undefined,
+  ) {
+    const { workspace, visitor, site } = await this.getVisitorContext(
+      workspaceSlug,
+      visitorToken,
+    );
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId: workspace.id,
+        siteId: site.id,
         visitorId: visitor.id,
       },
     });
@@ -90,29 +162,16 @@ export class MessagesService {
       throw new BadRequestException('El mensaje no puede estar vacío');
     }
 
-    const workspace = await this.prisma.workspace.findUnique({
-      where: {
-        slug: workspaceSlug.trim().toLowerCase(),
-      },
-    });
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace no encontrado');
-    }
-
-    if (workspace.status !== 'ACTIVE') {
-      throw new UnauthorizedException('El workspace está inactivo');
-    }
-
-    const visitor = await this.visitorsService.verifyVisitorToken(
+    const { workspace, visitor, site } = await this.getVisitorContext(
+      workspaceSlug,
       visitorToken,
-      workspace.id,
     );
 
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId: workspace.id,
+        siteId: site.id,
         visitorId: visitor.id,
       },
     });
@@ -184,10 +243,13 @@ export class MessagesService {
       throw new BadRequestException('El mensaje no puede estar vacío');
     }
 
+    const { agent, site } = await this.getAgentContext(workspaceId, userId);
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        siteId: site.id,
       },
     });
 
@@ -197,19 +259,6 @@ export class MessagesService {
 
     if (conversation.status === 'CLOSED') {
       throw new BadRequestException('La conversación está cerrada');
-    }
-
-    const agent = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        workspaceId,
-        role: 'AGENT',
-        status: 'ACTIVE',
-      },
-    });
-
-    if (!agent) {
-      throw new UnauthorizedException('Agente no autorizado');
     }
 
     if (conversation.assignedAgentId !== agent.id) {
@@ -273,29 +322,16 @@ export class MessagesService {
       throw new BadRequestException('Tipo de imagen no permitido');
     }
 
-    const workspace = await this.prisma.workspace.findUnique({
-      where: {
-        slug: workspaceSlug.trim().toLowerCase(),
-      },
-    });
-
-    if (!workspace) {
-      throw new NotFoundException('Workspace no encontrado');
-    }
-
-    if (workspace.status !== 'ACTIVE') {
-      throw new UnauthorizedException('El workspace está inactivo');
-    }
-
-    const visitor = await this.visitorsService.verifyVisitorToken(
+    const { workspace, visitor, site } = await this.getVisitorContext(
+      workspaceSlug,
       visitorToken,
-      workspace.id,
     );
 
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId: workspace.id,
+        siteId: site.id,
         visitorId: visitor.id,
       },
     });
@@ -403,10 +439,13 @@ export class MessagesService {
       throw new BadRequestException('Tipo de imagen no permitido');
     }
 
+    const { agent, site } = await this.getAgentContext(workspaceId, userId);
+
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
         workspaceId,
+        siteId: site.id,
       },
     });
 
@@ -416,19 +455,6 @@ export class MessagesService {
 
     if (conversation.status === 'CLOSED') {
       throw new BadRequestException('La conversación está cerrada');
-    }
-
-    const agent = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        workspaceId,
-        role: 'AGENT',
-        status: 'ACTIVE',
-      },
-    });
-
-    if (!agent) {
-      throw new UnauthorizedException('Agente no autorizado');
     }
 
     if (conversation.assignedAgentId !== agent.id) {
@@ -507,6 +533,7 @@ export class MessagesService {
             username: true,
             role: true,
             status: true,
+            siteId: true,
           },
         },
 
@@ -525,7 +552,10 @@ export class MessagesService {
     }
 
     /*
-     * OWNER / ADMIN / PLATFORM_ADMIN.
+     * RealtimeService ahora divide:
+     *
+     * OWNER / PLATFORM_ADMIN -> Workspace
+     * ADMIN                  -> Site
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       conversation.workspaceId,
@@ -533,13 +563,10 @@ export class MessagesService {
     );
 
     /*
-     * Si está asignada:
-     * actualizamos la bandeja privada
-     * del agente correspondiente.
+     * AGENT:
      *
-     * Si todavía no está asignada:
-     * actualizamos la bandeja compartida
-     * de todos los AGENT.
+     * asignada -> room privada
+     * sin asignar -> room unassigned del Site
      */
     if (conversation.assignedAgentId) {
       this.realtimeService.emitConversationUpdatedToUser(

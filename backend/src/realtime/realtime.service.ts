@@ -15,11 +15,7 @@ export class RealtimeService {
     /*
      * conversation:{conversationId}
      *
-     * A partir de ahora esta room queda
-     * reservada para el Visitor.
-     *
-     * Así el Visitor recibe tanto sus propios
-     * mensajes como los enviados por el Agent.
+     * Esta room sigue reservada para el Visitor.
      */
     this.realtimeGateway.emitToConversation(
       conversationId,
@@ -29,22 +25,19 @@ export class RealtimeService {
 
     /*
      * Los usuarios internos reciben el mensaje
-     * por su room de bandeja:
+     * según la audiencia real de la conversación:
      *
      * asignada:
      *   user:{agentId}
      *
      * sin asignar:
-     *   workspace:{workspaceId}:unassigned
+     *   site:{siteId}:unassigned
      */
     void this.emitNewMessageToInternalAudience(conversationId, message).catch(
       () => {
         /*
-         * REST continúa siendo la fuente
-         * autoritativa.
-         *
-         * Si realtime falla, un reconnect/refetch
-         * recuperará el estado.
+         * REST sigue siendo la fuente autoritativa.
+         * Un reconnect/refetch recuperará el estado.
          */
       },
     );
@@ -54,31 +47,70 @@ export class RealtimeService {
     workspaceId: string,
     conversation: unknown,
   ) {
+    /*
+     * OWNER / PLATFORM_ADMIN.
+     */
     this.realtimeGateway.emitToWorkspace(
       workspaceId,
       'conversation:updated',
       conversation,
     );
+
+    /*
+     * ADMIN.
+     *
+     * El ADMIN ya no está en la room general
+     * del Workspace. Está únicamente en:
+     *
+     * site:{siteId}
+     */
+    const siteId = this.getConversationSiteId(conversation);
+
+    if (siteId) {
+      this.realtimeGateway.emitToSite(
+        siteId,
+        'conversation:updated',
+        conversation,
+      );
+    }
   }
 
   emitConversationUpdatedToUnassigned(
-    workspaceId: string,
+    _workspaceId: string,
     conversation: unknown,
   ) {
-    this.realtimeGateway.emitToUnassigned(
-      workspaceId,
+    const siteId = this.getConversationSiteId(conversation);
+
+    if (!siteId) {
+      return;
+    }
+
+    this.realtimeGateway.emitToSiteUnassigned(
+      siteId,
       'conversation:updated',
       conversation,
     );
   }
 
   emitConversationRemovedFromUnassigned(
-    workspaceId: string,
+    _workspaceId: string,
     conversationId: string,
   ) {
-    this.realtimeGateway.emitToUnassigned(workspaceId, 'conversation:removed', {
-      conversationId,
-    });
+    /*
+     * Los callers antiguos solo entregan
+     * workspaceId + conversationId.
+     *
+     * Consultamos la conversación para obtener
+     * su siteId sin romper las firmas actuales.
+     */
+    void this.emitConversationRemovedFromUnassignedSite(conversationId).catch(
+      () => {
+        /*
+         * Si realtime falla, REST sigue siendo
+         * la fuente autoritativa.
+         */
+      },
+    );
   }
 
   emitConversationUpdatedToUser(userId: string, conversation: unknown) {
@@ -95,6 +127,32 @@ export class RealtimeService {
     });
   }
 
+  private async emitConversationRemovedFromUnassignedSite(
+    conversationId: string,
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: {
+        id: conversationId,
+      },
+
+      select: {
+        siteId: true,
+      },
+    });
+
+    if (!conversation?.siteId) {
+      return;
+    }
+
+    this.realtimeGateway.emitToSiteUnassigned(
+      conversation.siteId,
+      'conversation:removed',
+      {
+        conversationId,
+      },
+    );
+  }
+
   private async emitNewMessageToInternalAudience(
     conversationId: string,
     message: unknown,
@@ -106,6 +164,7 @@ export class RealtimeService {
 
       select: {
         workspaceId: true,
+        siteId: true,
         assignedAgentId: true,
       },
     });
@@ -124,10 +183,32 @@ export class RealtimeService {
       return;
     }
 
-    this.realtimeGateway.emitToUnassigned(
-      conversation.workspaceId,
+    if (!conversation.siteId) {
+      return;
+    }
+
+    this.realtimeGateway.emitToSiteUnassigned(
+      conversation.siteId,
       'message:new',
       message,
     );
+  }
+
+  private getConversationSiteId(conversation: unknown): string | null {
+    if (
+      typeof conversation !== 'object' ||
+      conversation === null ||
+      !('siteId' in conversation)
+    ) {
+      return null;
+    }
+
+    const siteId = conversation.siteId;
+
+    if (typeof siteId !== 'string' || !siteId.trim()) {
+      return null;
+    }
+
+    return siteId;
   }
 }

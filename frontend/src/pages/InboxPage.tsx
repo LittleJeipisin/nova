@@ -5,6 +5,12 @@ import {
   useState,
 } from 'react';
 
+import type {
+  ChangeEvent,
+  KeyboardEvent,
+  SyntheticEvent,
+} from 'react';
+
 import type { Socket } from 'socket.io-client';
 
 import {
@@ -16,8 +22,12 @@ import type { AuthUser } from '../auth/auth';
 
 import {
   claimConversation,
+  closeConversation,
   getConversation,
   getConversations,
+  sendAgentImageMessage,
+  sendAgentTextMessage,
+  updateConversationStatus,
 } from '../lib/api';
 
 import {
@@ -227,6 +237,43 @@ export function InboxPage({
       InboxNotification | null
     >(null);
 
+  const [
+    composerText,
+    setComposerText,
+  ] = useState('');
+
+  const [
+    selectedImage,
+    setSelectedImage,
+  ] =
+    useState<
+      File | null
+    >(null);
+
+  const [
+    imagePreviewUrl,
+    setImagePreviewUrl,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    sendingMessage,
+    setSendingMessage,
+  ] = useState(false);
+
+  const [
+    conversationAction,
+    setConversationAction,
+  ] =
+    useState<
+      'OPEN' |
+      'PENDING' |
+      'CLOSED' |
+      null
+    >(null);
+
   const socketRef =
     useRef<
       Socket | null
@@ -278,6 +325,16 @@ export function InboxPage({
       HTMLDivElement | null
     >(null);
 
+  const fileInputRef =
+    useRef<
+      HTMLInputElement | null
+    >(null);
+
+  const imagePreviewUrlRef =
+    useRef<
+      string | null
+    >(null);
+
   useEffect(
     () => {
       conversationsRef.current =
@@ -287,6 +344,35 @@ export function InboxPage({
       conversations,
     ],
   );
+
+  const resetComposer =
+    useCallback(
+      () => {
+        setComposerText('');
+        setSelectedImage(
+          null,
+        );
+
+        if (imagePreviewUrlRef.current) {
+          URL.revokeObjectURL(
+            imagePreviewUrlRef.current,
+          );
+
+          imagePreviewUrlRef.current =
+            null;
+        }
+
+        setImagePreviewUrl(
+          null,
+        );
+
+        if (fileInputRef.current) {
+          fileInputRef.current.value =
+            '';
+        }
+      },
+      [],
+    );
 
   const showNotification =
     useCallback(
@@ -425,6 +511,75 @@ export function InboxPage({
       },
       [],
     );
+  
+  const applyConversationStateUpdate =
+  useCallback(
+    (
+      conversation:
+        ConversationSummary,
+    ) => {
+      setConversations(
+        (
+          currentConversations,
+        ) =>
+          sortConversations(
+            currentConversations.map(
+              (
+                current,
+              ) => {
+                if (
+                  current.id !==
+                  conversation.id
+                ) {
+                  return current;
+                }
+
+                return {
+                  ...current,
+
+                  status:
+                    conversation.status,
+
+                  updatedAt:
+                    conversation.updatedAt,
+
+                  closedAt:
+                    conversation.closedAt,
+                };
+              },
+            ),
+          ),
+      );
+
+      setActiveConversation(
+        (
+          current,
+        ) => {
+          if (
+            !current ||
+            current.id !==
+              conversation.id
+          ) {
+            return current;
+          }
+
+          return {
+            ...current,
+
+            status:
+              conversation.status,
+
+            updatedAt:
+              conversation.updatedAt,
+
+            closedAt:
+              conversation.closedAt,
+          };
+        },
+      );
+    },
+    [],
+  );
 
   const removeConversation =
     useCallback(
@@ -827,6 +982,363 @@ export function InboxPage({
     }
   }
 
+  async function handleConversationStatus(
+    status: 'OPEN' | 'PENDING',
+  ) {
+    if (
+      !activeConversation ||
+      !activeConversation
+        .assignedAgentId ||
+      activeConversation.status ===
+        'CLOSED' ||
+      conversationAction
+    ) {
+      return;
+    }
+
+    const accessToken =
+      getStoredAccessToken() ??
+      '';
+
+    if (!accessToken) {
+      onLogout();
+
+      return;
+    }
+
+    const conversationId =
+      activeConversation.id;
+
+    try {
+      setConversationAction(
+        status,
+      );
+
+      setError(
+        null,
+      );
+
+      const updatedConversation =
+        await updateConversationStatus(
+          accessToken,
+          workspaceId,
+          conversationId,
+          status,
+        );
+
+      applyConversationStateUpdate(
+        updatedConversation,
+      );
+
+      showNotification({
+        type: 'success',
+        title:
+          status === 'OPEN'
+            ? 'Conversación abierta'
+            : 'Conversación pendiente',
+        message:
+          status === 'OPEN'
+            ? 'La conversación volvió a estado abierta.'
+            : 'La conversación quedó en estado pendiente.',
+      });
+    } catch (err) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cambiar el estado de la conversación',
+      );
+    } finally {
+      setConversationAction(
+        null,
+      );
+    }
+  }
+
+  async function handleCloseConversation() {
+    if (
+      !activeConversation ||
+      !activeConversation
+        .assignedAgentId ||
+      activeConversation.status ===
+        'CLOSED' ||
+      conversationAction
+    ) {
+      return;
+    }
+
+    const accessToken =
+      getStoredAccessToken() ??
+      '';
+
+    if (!accessToken) {
+      onLogout();
+
+      return;
+    }
+
+    const conversationId =
+      activeConversation.id;
+
+    try {
+      setConversationAction(
+        'CLOSED',
+      );
+
+      setError(
+        null,
+      );
+
+      const updatedConversation =
+        await closeConversation(
+          accessToken,
+          workspaceId,
+          conversationId,
+        );
+
+      applyConversationStateUpdate(
+        updatedConversation,
+      );
+
+      resetComposer();
+
+      showNotification({
+        type: 'success',
+        title:
+          'Conversación cerrada',
+        message:
+          'La conversación fue cerrada correctamente.',
+      });
+    } catch (err) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cerrar la conversación',
+      );
+    } finally {
+      setConversationAction(
+        null,
+      );
+    }
+  }
+
+  function handleImageChange(
+    event:
+      ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0] ??
+      null;
+
+    if (!file) {
+      return;
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ];
+
+    if (
+      !allowedTypes.includes(
+        file.type,
+      )
+    ) {
+      event.target.value = '';
+
+      showNotification({
+        type: 'warning',
+        title: 'Imagen no válida',
+        message:
+          'Solo se permiten imágenes JPEG, PNG, WEBP o GIF.',
+      });
+
+      return;
+    }
+
+    const maxSizeBytes =
+      5 * 1024 * 1024;
+
+    if (
+      file.size >
+      maxSizeBytes
+    ) {
+      event.target.value = '';
+
+      showNotification({
+        type: 'warning',
+        title: 'Imagen demasiado grande',
+        message:
+          'La imagen no puede superar los 5 MB.',
+      });
+
+      return;
+    }
+
+    const previewUrl =
+      URL.createObjectURL(
+        file,
+      );
+
+    if (imagePreviewUrlRef.current) {
+      URL.revokeObjectURL(
+        imagePreviewUrlRef.current,
+      );
+    }
+
+    imagePreviewUrlRef.current =
+      previewUrl;
+
+    setSelectedImage(
+      file,
+    );
+
+    setImagePreviewUrl(
+      previewUrl,
+    );
+  }
+
+  function clearSelectedImage() {
+    if (imagePreviewUrlRef.current) {
+      URL.revokeObjectURL(
+        imagePreviewUrlRef.current,
+      );
+
+      imagePreviewUrlRef.current =
+        null;
+    }
+
+    setSelectedImage(
+      null,
+    );
+
+    setImagePreviewUrl(
+      null,
+    );
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value =
+        '';
+    }
+  }
+
+  async function sendCurrentMessage() {
+    if (
+      !activeConversation ||
+      !activeConversation
+        .assignedAgentId ||
+      activeConversation.status ===
+        'CLOSED' ||
+      sendingMessage
+    ) {
+      return;
+    }
+
+    const content =
+      composerText.trim();
+
+    if (
+      !content &&
+      !selectedImage
+    ) {
+      return;
+    }
+
+    const accessToken =
+      getStoredAccessToken() ??
+      '';
+
+    if (!accessToken) {
+      onLogout();
+
+      return;
+    }
+
+    const conversationId =
+      activeConversation.id;
+
+    try {
+      setSendingMessage(
+        true,
+      );
+
+      setError(
+        null,
+      );
+
+      const sentMessage =
+        selectedImage
+          ? await sendAgentImageMessage(
+              accessToken,
+              workspaceId,
+              conversationId,
+              selectedImage,
+              content ||
+                undefined,
+            )
+          : await sendAgentTextMessage(
+              accessToken,
+              workspaceId,
+              conversationId,
+              content,
+            );
+
+      addMessage(
+        sentMessage,
+      );
+
+      resetComposer();
+    } catch (err) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo enviar el mensaje',
+      );
+    } finally {
+      setSendingMessage(
+        false,
+      );
+    }
+  }
+
+  function handleComposerSubmit(
+    event:
+      SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    void sendCurrentMessage();
+  }
+
+  function handleComposerKeyDown(
+    event:
+      KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    void sendCurrentMessage();
+  }
+
   useEffect(
     () => {
       if (
@@ -1087,6 +1599,15 @@ export function InboxPage({
               .current,
           );
         }
+
+        if (imagePreviewUrlRef.current) {
+          URL.revokeObjectURL(
+            imagePreviewUrlRef.current,
+          );
+
+          imagePreviewUrlRef.current =
+            null;
+        }
       };
     },
     [],
@@ -1182,6 +1703,8 @@ export function InboxPage({
             : 'nova-inbox__conversation'
         }
         onClick={() => {
+          resetComposer();
+
           void loadConversation(
             conversation.id,
           );
@@ -1422,7 +1945,7 @@ export function InboxPage({
 
                   {activeConversation
                     .assignedAgentId ===
-                    null && (
+                    null ? (
                     <button
                       type="button"
                       className="nova-inbox__claim-button"
@@ -1439,7 +1962,65 @@ export function InboxPage({
                         ? 'Tomando...'
                         : 'Tomar'}
                     </button>
-                  )}
+                  ) : activeConversation.status !==
+                    'CLOSED' ? (
+                    <>
+                      {activeConversation.status ===
+                      'OPEN' ? (
+                        <button
+                          type="button"
+                          disabled={
+                            conversationAction !==
+                            null
+                          }
+                          onClick={() => {
+                            void handleConversationStatus(
+                              'PENDING',
+                            );
+                          }}
+                        >
+                          {conversationAction ===
+                          'PENDING'
+                            ? 'Cambiando...'
+                            : 'Pendiente'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={
+                            conversationAction !==
+                            null
+                          }
+                          onClick={() => {
+                            void handleConversationStatus(
+                              'OPEN',
+                            );
+                          }}
+                        >
+                          {conversationAction ===
+                          'OPEN'
+                            ? 'Cambiando...'
+                            : 'Abrir'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={
+                          conversationAction !==
+                          null
+                        }
+                        onClick={() => {
+                          void handleCloseConversation();
+                        }}
+                      >
+                        {conversationAction ===
+                        'CLOSED'
+                          ? 'Cerrando...'
+                          : 'Cerrar'}
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </header>
 
@@ -1516,11 +2097,198 @@ export function InboxPage({
                   Toma esta conversación
                   para poder responder.
                 </footer>
-              ) : (
+              ) : activeConversation.status ===
+                'CLOSED' ? (
                 <footer className="nova-inbox__composer-placeholder">
-                  Conversación asignada a ti.
-                  En el siguiente paso
-                  habilitaremos las respuestas.
+                  Esta conversación está cerrada
+                  y ya no admite respuestas.
+                </footer>
+              ) : (
+                <footer
+                  className="nova-inbox__composer-placeholder"
+                  style={{
+                    display: 'block',
+                    padding: '12px',
+                  }}
+                >
+                  {selectedImage && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginBottom: '10px',
+                        padding: '8px',
+                        borderRadius: '10px',
+                        background:
+                          'rgba(255, 255, 255, 0.06)',
+                      }}
+                    >
+                      {imagePreviewUrl && (
+                        <img
+                          src={imagePreviewUrl}
+                          alt="Vista previa de la imagen"
+                          style={{
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '8px',
+                            objectFit: 'cover',
+                            flexShrink: 0,
+                          }}
+                        />
+                      )}
+
+                      <div
+                        style={{
+                          minWidth: 0,
+                          flex: 1,
+                          textAlign: 'left',
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display: 'block',
+                            overflow: 'hidden',
+                            textOverflow:
+                              'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {selectedImage.name}
+                        </strong>
+
+                        <span
+                          style={{
+                            opacity: 0.7,
+                            fontSize: '12px',
+                          }}
+                        >
+                          {(
+                            selectedImage.size /
+                            1024 /
+                            1024
+                          ).toFixed(2)}{' '}
+                          MB
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        aria-label="Quitar imagen"
+                        disabled={sendingMessage}
+                        onClick={
+                          clearSelectedImage
+                        }
+                        style={{
+                          border: 0,
+                          background:
+                            'transparent',
+                          fontSize: '20px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
+                  <form
+                    onSubmit={
+                      handleComposerSubmit
+                    }
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      gap: '8px',
+                    }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      hidden
+                      onChange={
+                        handleImageChange
+                      }
+                    />
+
+                    <button
+                      type="button"
+                      aria-label="Adjuntar imagen"
+                      title="Adjuntar imagen"
+                      disabled={sendingMessage}
+                      onClick={() => {
+                        fileInputRef.current
+                          ?.click();
+                      }}
+                      style={{
+                        minWidth: '44px',
+                        minHeight: '44px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      📎
+                    </button>
+
+                    <textarea
+                      value={composerText}
+                      placeholder="Escribe un mensaje..."
+                      aria-label="Mensaje"
+                      rows={1}
+                      disabled={sendingMessage}
+                      onChange={(event) => {
+                        setComposerText(
+                          event.target.value,
+                        );
+                      }}
+                      onKeyDown={
+                        handleComposerKeyDown
+                      }
+                      style={{
+                        flex: 1,
+                        minHeight: '44px',
+                        maxHeight: '120px',
+                        resize: 'vertical',
+                        padding: '10px 12px',
+                        borderRadius: '10px',
+                        font: 'inherit',
+                      }}
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={
+                        sendingMessage ||
+                        (!composerText.trim() &&
+                          !selectedImage)
+                      }
+                      style={{
+                        minHeight: '44px',
+                        padding: '0 16px',
+                        borderRadius: '10px',
+                        cursor: sendingMessage
+                          ? 'wait'
+                          : 'pointer',
+                      }}
+                    >
+                      {sendingMessage
+                        ? 'Enviando...'
+                        : 'Enviar'}
+                    </button>
+                  </form>
+
+                  <div
+                    style={{
+                      marginTop: '6px',
+                      textAlign: 'left',
+                      fontSize: '12px',
+                      opacity: 0.65,
+                    }}
+                  >
+                    Enter para enviar · Shift +
+                    Enter para salto de línea
+                  </div>
                 </footer>
               )}
             </>

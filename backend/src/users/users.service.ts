@@ -1,21 +1,26 @@
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
 } from '@nestjs/common';
 
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
+type WorkspaceRequester = {
+  userId: string;
+  role: string;
+  workspaceId: string | null;
+  ownerType?: string | null;
+};
+
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createOwner(
-    workspaceId: string,
-    username: string,
-  ) {
+  async createOwner(workspaceId: string, username: string) {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
         id: workspaceId,
@@ -36,12 +41,11 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new Error(
-        'Username already exists in this workspace',
-      );
+      throw new Error('Username already exists in this workspace');
     }
 
     const password = randomBytes(6).toString('base64url');
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const user = await this.prisma.user.create({
@@ -58,6 +62,7 @@ export class UsersService {
       username: user.username,
       role: user.role,
       workspaceId: user.workspaceId,
+      siteId: user.siteId,
       password,
     };
   }
@@ -93,12 +98,11 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new Error(
-        'Username already exists in this workspace',
-      );
+      throw new Error('Username already exists in this workspace');
     }
 
     const password = randomBytes(6).toString('base64url');
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const user = await this.prisma.user.create({
@@ -118,6 +122,7 @@ export class UsersService {
       role: user.role,
       ownerType: user.ownerType,
       workspaceId: user.workspaceId,
+      siteId: user.siteId,
       expiresAt: user.expiresAt,
       password,
     };
@@ -126,12 +131,8 @@ export class UsersService {
   async createAdmin(
     workspaceId: string,
     username: string,
-    requester: {
-      userId: string;
-      role: string;
-      workspaceId: string | null;
-      ownerType?: string | null;
-    },
+    siteId: string,
+    requester: WorkspaceRequester,
   ) {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
@@ -143,13 +144,24 @@ export class UsersService {
       throw new NotFoundException('Workspace not found');
     }
 
-    if (
-      requester.role === 'OWNER' &&
-      requester.ownerType === 'TEMPORARY'
-    ) {
-      throw new ForbiddenException(
-        'Temporary owners cannot create admins',
-      );
+    if (requester.role === 'OWNER' && requester.ownerType === 'TEMPORARY') {
+      throw new ForbiddenException('Temporary owners cannot create admins');
+    }
+
+    if (!siteId) {
+      throw new BadRequestException('Debes seleccionar una página');
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: siteId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new NotFoundException('Página no encontrada o inactiva');
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -162,12 +174,11 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new Error(
-        'Username already exists in this workspace',
-      );
+      throw new Error('Username already exists in this workspace');
     }
 
     const password = randomBytes(6).toString('base64url');
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const user = await this.prisma.user.create({
@@ -176,6 +187,7 @@ export class UsersService {
         passwordHash,
         role: 'ADMIN',
         workspaceId,
+        siteId: site.id,
       },
     });
 
@@ -184,6 +196,7 @@ export class UsersService {
       username: user.username,
       role: user.role,
       workspaceId: user.workspaceId,
+      siteId: user.siteId,
       password,
     };
   }
@@ -191,6 +204,7 @@ export class UsersService {
   async createAgent(
     workspaceId: string,
     username: string,
+    requester: WorkspaceRequester,
   ) {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
@@ -200,6 +214,35 @@ export class UsersService {
 
     if (!workspace) {
       throw new NotFoundException('Workspace not found');
+    }
+
+    const admin = await this.prisma.user.findFirst({
+      where: {
+        id: requester.userId,
+        workspaceId,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!admin || !admin.siteId) {
+      throw new ForbiddenException(
+        'El administrador no tiene una página asignada',
+      );
+    }
+
+    const site = await this.prisma.site.findFirst({
+      where: {
+        id: admin.siteId,
+        workspaceId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!site) {
+      throw new ForbiddenException(
+        'La página del administrador no está disponible',
+      );
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -212,12 +255,11 @@ export class UsersService {
     });
 
     if (existingUser) {
-      throw new Error(
-        'Username already exists in this workspace',
-      );
+      throw new Error('Username already exists in this workspace');
     }
 
     const password = randomBytes(6).toString('base64url');
+
     const passwordHash = await bcrypt.hash(password, 12);
 
     const user = await this.prisma.user.create({
@@ -226,6 +268,7 @@ export class UsersService {
         passwordHash,
         role: 'AGENT',
         workspaceId,
+        siteId: admin.siteId,
       },
     });
 
@@ -234,11 +277,12 @@ export class UsersService {
       username: user.username,
       role: user.role,
       workspaceId: user.workspaceId,
+      siteId: user.siteId,
       password,
     };
   }
 
-  async findAll(workspaceId: string) {
+  async findAll(workspaceId: string, requester: WorkspaceRequester) {
     const workspace = await this.prisma.workspace.findUnique({
       where: {
         id: workspaceId,
@@ -249,10 +293,34 @@ export class UsersService {
       throw new NotFoundException('Workspace not found');
     }
 
+    const where: {
+      workspaceId: string;
+      siteId?: string;
+    } = {
+      workspaceId,
+    };
+
+    if (requester.role === 'ADMIN') {
+      const admin = await this.prisma.user.findFirst({
+        where: {
+          id: requester.userId,
+          workspaceId,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!admin?.siteId) {
+        throw new ForbiddenException(
+          'El administrador no tiene una página asignada',
+        );
+      }
+
+      where.siteId = admin.siteId;
+    }
+
     return this.prisma.user.findMany({
-      where: {
-        workspaceId,
-      },
+      where,
       select: {
         id: true,
         username: true,
@@ -261,6 +329,7 @@ export class UsersService {
         ownerType: true,
         expiresAt: true,
         workspaceId: true,
+        siteId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -273,12 +342,38 @@ export class UsersService {
   async findOne(
     workspaceId: string,
     userId: string,
+    requester: WorkspaceRequester,
   ) {
+    const where: {
+      id: string;
+      workspaceId: string;
+      siteId?: string;
+    } = {
+      id: userId,
+      workspaceId,
+    };
+
+    if (requester.role === 'ADMIN') {
+      const admin = await this.prisma.user.findFirst({
+        where: {
+          id: requester.userId,
+          workspaceId,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!admin?.siteId) {
+        throw new ForbiddenException(
+          'El administrador no tiene una página asignada',
+        );
+      }
+
+      where.siteId = admin.siteId;
+    }
+
     const user = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        workspaceId,
-      },
+      where,
       select: {
         id: true,
         username: true,
@@ -287,6 +382,7 @@ export class UsersService {
         ownerType: true,
         expiresAt: true,
         workspaceId: true,
+        siteId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -302,12 +398,7 @@ export class UsersService {
   async deactivate(
     workspaceId: string,
     userId: string,
-    requester: {
-      userId: string;
-      role: string;
-      workspaceId: string | null;
-      ownerType?: string | null;
-    },
+    requester: WorkspaceRequester,
   ) {
     const targetUser = await this.prisma.user.findFirst({
       where: {
@@ -321,9 +412,7 @@ export class UsersService {
     }
 
     if (targetUser.id === requester.userId) {
-      throw new ForbiddenException(
-        'You cannot deactivate yourself',
-      );
+      throw new ForbiddenException('You cannot deactivate yourself');
     }
 
     if (requester.role === 'PLATFORM_ADMIN') {
@@ -342,24 +431,17 @@ export class UsersService {
           ownerType: true,
           expiresAt: true,
           workspaceId: true,
+          siteId: true,
         },
       });
     }
 
-    if (
-      requester.role === 'OWNER' &&
-      requester.ownerType === 'TEMPORARY'
-    ) {
-      throw new ForbiddenException(
-        'Temporary owners cannot manage users',
-      );
+    if (requester.role === 'OWNER' && requester.ownerType === 'TEMPORARY') {
+      throw new ForbiddenException('Temporary owners cannot manage users');
     }
 
     if (requester.role === 'OWNER') {
-      if (
-        targetUser.role !== 'ADMIN' &&
-        targetUser.role !== 'AGENT'
-      ) {
+      if (targetUser.role !== 'ADMIN' && targetUser.role !== 'AGENT') {
         throw new ForbiddenException(
           'Owners can only manage admins and agents',
         );
@@ -368,8 +450,21 @@ export class UsersService {
 
     if (requester.role === 'ADMIN') {
       if (targetUser.role !== 'AGENT') {
+        throw new ForbiddenException('Admins can only manage agents');
+      }
+
+      const admin = await this.prisma.user.findFirst({
+        where: {
+          id: requester.userId,
+          workspaceId,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!admin?.siteId || targetUser.siteId !== admin.siteId) {
         throw new ForbiddenException(
-          'Admins can only manage agents',
+          'Admins can only manage agents from their site',
         );
       }
     }
@@ -389,6 +484,7 @@ export class UsersService {
         ownerType: true,
         expiresAt: true,
         workspaceId: true,
+        siteId: true,
       },
     });
   }
@@ -396,12 +492,7 @@ export class UsersService {
   async activate(
     workspaceId: string,
     userId: string,
-    requester: {
-      userId: string;
-      role: string;
-      workspaceId: string | null;
-      ownerType?: string | null;
-    },
+    requester: WorkspaceRequester,
   ) {
     const targetUser = await this.prisma.user.findFirst({
       where: {
@@ -415,9 +506,7 @@ export class UsersService {
     }
 
     if (targetUser.id === requester.userId) {
-      throw new ForbiddenException(
-        'You cannot activate yourself',
-      );
+      throw new ForbiddenException('You cannot activate yourself');
     }
 
     if (requester.role === 'PLATFORM_ADMIN') {
@@ -436,24 +525,17 @@ export class UsersService {
           ownerType: true,
           expiresAt: true,
           workspaceId: true,
+          siteId: true,
         },
       });
     }
 
-    if (
-      requester.role === 'OWNER' &&
-      requester.ownerType === 'TEMPORARY'
-    ) {
-      throw new ForbiddenException(
-        'Temporary owners cannot manage users',
-      );
+    if (requester.role === 'OWNER' && requester.ownerType === 'TEMPORARY') {
+      throw new ForbiddenException('Temporary owners cannot manage users');
     }
 
     if (requester.role === 'OWNER') {
-      if (
-        targetUser.role !== 'ADMIN' &&
-        targetUser.role !== 'AGENT'
-      ) {
+      if (targetUser.role !== 'ADMIN' && targetUser.role !== 'AGENT') {
         throw new ForbiddenException(
           'Owners can only manage admins and agents',
         );
@@ -462,8 +544,21 @@ export class UsersService {
 
     if (requester.role === 'ADMIN') {
       if (targetUser.role !== 'AGENT') {
+        throw new ForbiddenException('Admins can only manage agents');
+      }
+
+      const admin = await this.prisma.user.findFirst({
+        where: {
+          id: requester.userId,
+          workspaceId,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!admin?.siteId || targetUser.siteId !== admin.siteId) {
         throw new ForbiddenException(
-          'Admins can only manage agents',
+          'Admins can only manage agents from their site',
         );
       }
     }
@@ -483,6 +578,7 @@ export class UsersService {
         ownerType: true,
         expiresAt: true,
         workspaceId: true,
+        siteId: true,
       },
     });
   }

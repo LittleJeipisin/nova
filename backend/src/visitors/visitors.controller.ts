@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 
 import { VisitorsService } from './visitors.service';
 
@@ -10,15 +10,21 @@ export class VisitorsController {
   async getConfig(
     @Param('workspaceSlug')
     workspaceSlug: string,
+
+    @Query('site')
+    siteSlug: string | undefined,
   ) {
-    return this.visitorsService.getConfig(workspaceSlug);
+    return this.visitorsService.getConfig(workspaceSlug, siteSlug);
   }
 
   @Post(':workspaceSlug/visitors')
   async create(
     @Param('workspaceSlug')
     workspaceSlug: string,
+
+    @Body('site')
+    siteSlug: string | undefined,
   ) {
-    return this.visitorsService.create(workspaceSlug);
+    return this.visitorsService.create(workspaceSlug, siteSlug);
   }
 }

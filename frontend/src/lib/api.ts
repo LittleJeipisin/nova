@@ -294,3 +294,321 @@ export async function closeConversation(
     await response.json()
   ) as ConversationSummary;
 }
+
+export async function assignConversation(
+  accessToken: string,
+  workspaceId: string,
+  conversationId: string,
+  agentId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/conversations/${conversationId}/assign`,
+      {
+        method: 'PATCH',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body:
+          JSON.stringify({
+            agentId,
+          }),
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo asignar la conversación',
+  );
+
+  return (
+    await response.json()
+  ) as ConversationSummary;
+}
+
+export type Site = {
+  id: string;
+  workspaceId: string;
+  name: string;
+  slug: string;
+  domain: string | null;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function getSites(
+  accessToken: string,
+  workspaceId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/sites`,
+      {
+        method: 'GET',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudieron cargar las páginas',
+  );
+
+  return (
+    await response.json()
+  ) as Site[];
+}
+
+export async function createSite(
+  accessToken: string,
+  workspaceId: string,
+  data: {
+    name: string;
+    slug?: string;
+    domain?: string;
+  },
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/sites`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body:
+          JSON.stringify(data),
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo crear la página',
+  );
+
+  return (
+    await response.json()
+  ) as Site;
+}
+
+export async function deactivateSite(
+  accessToken: string,
+  workspaceId: string,
+  siteId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/sites/${siteId}/deactivate`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo desactivar la página',
+  );
+
+  return (
+    await response.json()
+  ) as Site;
+}
+
+export async function activateSite(
+  accessToken: string,
+  workspaceId: string,
+  siteId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/sites/${siteId}/activate`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo reactivar la página',
+  );
+
+  return (
+    await response.json()
+  ) as Site;
+}
+
+export type WorkspaceUser = {
+  id: string;
+  username: string;
+  role:
+    | 'PLATFORM_ADMIN'
+    | 'OWNER'
+    | 'ADMIN'
+    | 'AGENT';
+  status: 'ACTIVE' | 'INACTIVE';
+  ownerType: string | null;
+  expiresAt: string | null;
+  workspaceId: string | null;
+  siteId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export async function getWorkspaceUsers(
+  accessToken: string,
+  workspaceId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/users`,
+      {
+        method: 'GET',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudieron cargar los usuarios',
+  );
+
+  return (
+    await response.json()
+  ) as WorkspaceUser[];
+}
+
+export type CreatedWorkspaceUser = {
+  id: string;
+  username: string;
+  role: string;
+  workspaceId: string | null;
+  siteId: string | null;
+  password: string;
+};
+
+export async function createAgent(
+  accessToken: string,
+  workspaceId: string,
+  username: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/agents`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body: JSON.stringify({
+          username,
+        }),
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo crear el agente',
+  );
+
+  return (
+    await response.json()
+  ) as CreatedWorkspaceUser;
+}
+
+export async function createAdmin(
+  accessToken: string,
+  workspaceId: string,
+  username: string,
+  siteId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/admins`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body: JSON.stringify({
+          username,
+          siteId,
+        }),
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo crear el administrador',
+  );
+
+  return (
+    await response.json()
+  ) as CreatedWorkspaceUser;
+}
+
+export async function deactivateWorkspaceUser(
+  accessToken: string,
+  workspaceId: string,
+  userId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/users/${userId}/deactivate`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo desactivar el usuario',
+  );
+
+  return (
+    await response.json()
+  ) as WorkspaceUser;
+}
+
+export async function activateWorkspaceUser(
+  accessToken: string,
+  workspaceId: string,
+  userId: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/workspaces/${workspaceId}/users/${userId}/activate`,
+      {
+        method: 'PATCH',
+      },
+      accessToken,
+    );
+
+  await ensureOk(
+    response,
+    'No se pudo reactivar el usuario',
+  );
+
+  return (
+    await response.json()
+  ) as WorkspaceUser;
+}

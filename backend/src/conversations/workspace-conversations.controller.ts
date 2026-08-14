@@ -69,11 +69,13 @@ export class WorkspaceConversationsController {
     @Param('workspaceId') workspaceId: string,
     @Param('conversationId') conversationId: string,
     @Body('agentId') agentId: string,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.conversationsService.assignAgent(
       workspaceId,
       conversationId,
       agentId,
+      request.user,
     );
   }
 

@@ -10,6 +10,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 
+import type { Request } from 'express';
+
 import { FileInterceptor } from '@nestjs/platform-express';
 
 import { MessagesService } from './messages.service';
@@ -20,25 +22,32 @@ import { RolesGuard } from '../auth/guards/roles.guards';
 import { WorkspaceGuard } from '../auth/guards/workspace.guards';
 import { Roles } from '../auth/decorators/roles.decorators';
 
+type AuthenticatedRequest = Request & {
+  user: {
+    userId: string;
+    role: string;
+  };
+};
+
 @Controller('workspaces')
 export class WorkspaceMessagesController {
-  constructor(
-    private readonly messagesService: MessagesService,
-  ) {}
+  constructor(private readonly messagesService: MessagesService) {}
 
   @Post(':workspaceId/conversations/:conversationId/messages')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
   @Roles('AGENT')
   async createAgentMessage(
-    @Param('workspaceId') workspaceId: string,
-    @Param('conversationId') conversationId: string,
-    @Body('content') content: string,
-    @Req() request: any,
+    @Param('workspaceId')
+    workspaceId: string,
+
+    @Param('conversationId')
+    conversationId: string,
+
+    @Body('content')
+    content: string,
+
+    @Req()
+    request: AuthenticatedRequest,
   ) {
     return this.messagesService.createAgentMessage(
       workspaceId,
@@ -49,12 +58,7 @@ export class WorkspaceMessagesController {
   }
 
   @Post(':workspaceId/conversations/:conversationId/images')
-  @UseGuards(
-    JwtAuthGuard,
-    PasswordChangedGuard,
-    RolesGuard,
-    WorkspaceGuard,
-  )
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
   @Roles('AGENT')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -64,10 +68,18 @@ export class WorkspaceMessagesController {
     }),
   )
   async createAgentImageMessage(
-    @Param('workspaceId') workspaceId: string,
-    @Param('conversationId') conversationId: string,
-    @Body('content') content: string | undefined,
-    @Req() request: any,
+    @Param('workspaceId')
+    workspaceId: string,
+
+    @Param('conversationId')
+    conversationId: string,
+
+    @Body('content')
+    content: string | undefined,
+
+    @Req()
+    request: AuthenticatedRequest,
+
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({

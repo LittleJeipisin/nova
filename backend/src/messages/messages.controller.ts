@@ -16,9 +16,7 @@ import { MessagesService } from './messages.service';
 
 @Controller('widget')
 export class MessagesController {
-  constructor(
-    private readonly messagesService: MessagesService,
-  ) {}
+  constructor(private readonly messagesService: MessagesService) {}
 
   @Get(':workspaceSlug/conversations/:conversationId/messages')
   async getVisitorMessages(
@@ -84,24 +82,21 @@ export class MessagesController {
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
-          fileType:
-            /^image\/(jpeg|png|webp|gif)$/,
+          fileType: /^image\/(jpeg|png|webp|gif)$/,
         })
         .addMaxSizeValidator({
-          maxSize:
-            5 * 1024 * 1024,
+          maxSize: 5 * 1024 * 1024,
         })
         .build(),
     )
     file: Express.Multer.File,
   ) {
-    return this.messagesService
-      .createVisitorImageMessage(
-        workspaceSlug,
-        conversationId,
-        authorization,
-        file,
-        content,
-      );
+    return this.messagesService.createVisitorImageMessage(
+      workspaceSlug,
+      conversationId,
+      authorization,
+      file,
+      content,
+    );
   }
 }
