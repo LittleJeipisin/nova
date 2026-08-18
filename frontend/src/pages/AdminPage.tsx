@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
 } from 'react';
 
@@ -37,6 +38,10 @@ import type {
   WorkspaceUser,
 } from '../lib/api';
 
+import {
+  connectAgentSocket,
+} from '../lib/socket';
+
 import type {
   ConversationDetail,
   ConversationSummary,
@@ -46,6 +51,16 @@ type AdminPageProps = {
   user: AuthUser;
   onLogout: () => void;
 };
+
+function sortConversations(
+  conversations: ConversationSummary[],
+) {
+  return [...conversations].sort(
+    (a, b) =>
+      new Date(b.updatedAt).getTime() -
+      new Date(a.updatedAt).getTime(),
+  );
+}
 
 async function fetchAdminData(
   workspaceId: string,
@@ -90,6 +105,10 @@ export function AdminPage({
 }: AdminPageProps) {
   const workspaceId =
     user.workspaceId ?? '';
+  const activeConversationIdRef =
+    useRef<string | null>(
+      null,
+    );
 
   const [
     conversations,
@@ -283,6 +302,17 @@ function getSiteName(
   );
 }
 
+useEffect(
+  () => {
+    activeConversationIdRef.current =
+      activeConversation?.id ??
+      null;
+  },
+  [
+    activeConversation?.id,
+  ],
+);
+
   async function loadData() {
     if (!workspaceId) {
       return;
@@ -377,6 +407,214 @@ function getSiteName(
       cancelled = true;
     };
   }, [workspaceId]);
+
+  useEffect(
+  () => {
+    if (
+      !workspaceId ||
+      (
+        user.role !==
+          'OWNER' &&
+        user.role !==
+          'ADMIN'
+      )
+    ) {
+      return;
+    }
+
+    const accessToken =
+      getStoredAccessToken() ??
+      '';
+
+    if (!accessToken) {
+      onLogout();
+
+      return;
+    }
+
+    let cancelled =
+      false;
+
+    async function syncConversations() {
+      try {
+        const validAccessToken =
+          await getValidAccessToken(
+            getStoredAccessToken() ??
+              undefined,
+          );
+
+        const latestConversations =
+          await getConversations(
+            validAccessToken,
+            workspaceId,
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        setConversations(
+          sortConversations(
+            latestConversations,
+          ),
+        );
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          'No se pudo resincronizar la bandeja administrativa:',
+          err,
+        );
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'No se pudieron actualizar las conversaciones',
+        );
+      }
+    }
+
+    async function refreshOpenConversation(
+      conversationId: string,
+    ) {
+      try {
+        const validAccessToken =
+          await getValidAccessToken(
+            getStoredAccessToken() ??
+              undefined,
+          );
+
+        const conversation =
+          await getConversation(
+            validAccessToken,
+            workspaceId,
+            conversationId,
+          );
+
+        if (
+          cancelled ||
+          activeConversationIdRef
+            .current !==
+            conversationId
+        ) {
+          return;
+        }
+
+        setActiveConversation(
+          conversation,
+        );
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          'No se pudo actualizar el chat abierto:',
+          err,
+        );
+      }
+    }
+
+    const socket =
+      connectAgentSocket(
+        accessToken,
+        workspaceId,
+        {
+          onWorkspaceJoined() {
+            if (cancelled) {
+              return;
+            }
+
+            /*
+             * Socket no es retroactivo.
+             *
+             * Cada vez que conecta o
+             * reconecta, sincronizamos
+             * nuevamente mediante REST.
+             */
+            void syncConversations();
+          },
+
+          onConversationUpdated(
+            conversation,
+          ) {
+            if (cancelled) {
+              return;
+            }
+
+            /*
+             * Añadimos una conversación
+             * nueva o reemplazamos una
+             * existente.
+             */
+            setConversations(
+              (
+                currentConversations,
+              ) => {
+                const withoutCurrent =
+                  currentConversations.filter(
+                    (
+                      current,
+                    ) =>
+                      current.id !==
+                      conversation.id,
+                  );
+
+                return sortConversations([
+                  conversation,
+                  ...withoutCurrent,
+                ]);
+              },
+            );
+
+            /*
+             * El evento contiene el resumen.
+             *
+             * Si tenemos ese chat abierto,
+             * pedimos el detalle completo
+             * para actualizar también los
+             * mensajes.
+             */
+            if (
+              activeConversationIdRef
+                .current ===
+              conversation.id
+            ) {
+              void refreshOpenConversation(
+                conversation.id,
+              );
+            }
+          },
+
+          onError(
+            message,
+          ) {
+            if (cancelled) {
+              return;
+            }
+
+            setError(
+              message,
+            );
+          },
+        },
+      );
+
+    return () => {
+      cancelled =
+        true;
+
+      socket.disconnect();
+    };
+  },
+  [
+    onLogout,
+    user.role,
+    workspaceId,
+  ],
+);
 
 
   async function handleCreateAdmin(

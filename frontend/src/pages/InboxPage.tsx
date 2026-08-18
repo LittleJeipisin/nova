@@ -1407,13 +1407,63 @@ export function InboxPage({
               );
             },
 
-            onConversationUpdated(
-              conversation,
-            ) {
-              upsertConversation(
-                conversation,
-              );
-            },
+onConversationUpdated(
+  conversation,
+) {
+  const previousConversation =
+    conversationsRef.current.find(
+      (
+        currentConversation,
+      ) =>
+        currentConversation.id ===
+        conversation.id,
+    );
+
+  const wasAlreadyAssignedToMe =
+    previousConversation
+      ?.assignedAgentId ===
+    user.userId;
+
+  const isNowAssignedToMe =
+    conversation.assignedAgentId ===
+    user.userId;
+
+  const isMyOwnClaim =
+    claimingConversationIdRef
+      .current ===
+    conversation.id;
+
+  /*
+   * Si la conversación acaba de
+   * ser asignada a este agente
+   * desde OWNER / ADMIN,
+   * mostramos una notificación.
+   *
+   * No notificamos:
+   * - si ya estaba asignada;
+   * - si el propio agente la tomó.
+   */
+  if (
+    isNowAssignedToMe &&
+    !wasAlreadyAssignedToMe &&
+    !isMyOwnClaim
+  ) {
+    showNotification({
+      type: 'success',
+      title:
+        'Nueva conversación asignada',
+      message:
+        `Te asignaron la conversación del visitante ${conversation.visitor.id.slice(
+          0,
+          8,
+        )}.`,
+    });
+  }
+
+  upsertConversation(
+    conversation,
+  );
+},
 
             onConversationRemoved(
               conversationId,
@@ -1564,15 +1614,16 @@ export function InboxPage({
       };
     },
     [
-      addMessage,
-      clearClaimProtection,
-      onLogout,
-      removeConversation,
-      showNotification,
-      upsertConversation,
-      user.role,
-      workspaceId,
-    ],
+  addMessage,
+  clearClaimProtection,
+  onLogout,
+  removeConversation,
+  showNotification,
+  upsertConversation,
+  user.role,
+  user.userId,
+  workspaceId,
+],
   );
 
   useEffect(

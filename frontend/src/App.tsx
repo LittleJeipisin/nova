@@ -3,6 +3,10 @@ import {
   useState,
 } from 'react';
 
+import {
+  ChangePasswordPage,
+} from './pages/ChangePasswordPage';
+
 import './App.css';
 
 import {
@@ -177,6 +181,22 @@ function App() {
       />
     );
   }
+
+  if (
+  user.mustChangePassword
+) {
+  return (
+    <ChangePasswordPage
+      user={user}
+      onPasswordChanged={
+        handleAuthenticated
+      }
+      onLogout={
+        handleLogout
+      }
+    />
+  );
+}
 
   if (user.role === 'AGENT') {
     return (

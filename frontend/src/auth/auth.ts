@@ -508,6 +508,47 @@ export async function getMe(
   ) as AuthUser;
 }
 
+export async function changePassword(
+  accessToken: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const response =
+    await authFetch(
+      `${NOVA_API_URL}/auth/change-password`,
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type':
+            'application/json',
+        },
+
+        body:
+          JSON.stringify({
+            currentPassword,
+            newPassword,
+          }),
+      },
+      accessToken,
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      await getErrorMessage(
+        response,
+        'No se pudo cambiar la contraseña',
+      ),
+    );
+  }
+
+  return (
+    await response.json()
+  ) as {
+    message: string;
+  };
+}
+
 export async function logout() {
   try {
     await fetch(
