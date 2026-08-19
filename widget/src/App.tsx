@@ -70,7 +70,9 @@ function App() {
     config,
     setConfig,
   ] =
-    useState<NovaWidgetConfig | null>(
+    useState<
+      NovaWidgetConfig | null
+    >(
       null,
     );
 
@@ -78,7 +80,9 @@ function App() {
     configError,
     setConfigError,
   ] =
-    useState<string | null>(
+    useState<
+      string | null
+    >(
       null,
     );
 
@@ -102,7 +106,9 @@ function App() {
     session,
     setSession,
   ] =
-    useState<NovaSession | null>(
+    useState<
+      NovaSession | null
+    >(
       null,
     );
 
@@ -118,17 +124,15 @@ function App() {
     messages,
     setMessages,
   ] =
-    useState<NovaMessage[]>(
-      [],
-    );
+    useState<
+      NovaMessage[]
+    >([]);
 
   const [
     input,
     setInput,
   ] =
-    useState(
-      '',
-    );
+    useState('');
 
   const [
     sending,
@@ -142,7 +146,9 @@ function App() {
     selectedImage,
     setSelectedImage,
   ] =
-    useState<File | null>(
+    useState<
+      File | null
+    >(
       null,
     );
 
@@ -150,7 +156,9 @@ function App() {
     imagePreview,
     setImagePreview,
   ] =
-    useState<string | null>(
+    useState<
+      string | null
+    >(
       null,
     );
 
@@ -158,17 +166,23 @@ function App() {
     error,
     setError,
   ] =
-    useState<string | null>(
+    useState<
+      string | null
+    >(
       null,
     );
 
   const messagesEndRef =
-    useRef<HTMLDivElement | null>(
+    useRef<
+      HTMLDivElement | null
+    >(
       null,
     );
 
   const fileInputRef =
-    useRef<HTMLInputElement | null>(
+    useRef<
+      HTMLInputElement | null
+    >(
       null,
     );
 
@@ -269,8 +283,8 @@ function App() {
     );
 
   /*
-   * Conecta Socket únicamente cuando
-   * ya existe una Conversation real.
+   * Conectamos Socket solamente
+   * cuando existe una Conversation.
    */
   const connectSessionSocket =
     useCallback(
@@ -351,11 +365,11 @@ function App() {
     );
 
   /*
-   * Al cargar la página solamente
-   * obtenemos configuración pública.
+   * Al cargar solamente obtenemos
+   * configuración pública.
    *
-   * No se crea Visitor.
-   * No se crea Conversation.
+   * Aquí NO se crea Visitor.
+   * Aquí NO se crea Conversation.
    */
   useEffect(
     () => {
@@ -414,8 +428,7 @@ function App() {
   );
 
   /*
-   * Desconectamos Socket solamente
-   * cuando el componente desaparece.
+   * Desconecta Socket al desmontar.
    */
   useEffect(
     () => {
@@ -430,9 +443,14 @@ function App() {
     [],
   );
 
+  /*
+   * Scroll automático.
+   */
   useEffect(
     () => {
-      if (!isOpen) {
+      if (
+        !isOpen
+      ) {
         return;
       }
 
@@ -448,6 +466,9 @@ function App() {
     ],
   );
 
+  /*
+   * Libera preview de imágenes.
+   */
   useEffect(
     () => {
       if (
@@ -468,17 +489,60 @@ function App() {
   );
 
   /*
-   * Al abrir el widget:
+   * Comunicación con loader.js.
    *
-   * - si no existe visitorToken,
-   *   no hacemos nada;
+   * Si estamos dentro de iframe,
+   * notificamos cada cambio:
    *
-   * - si existe visitorToken pero no
-   *   hay conversación con mensajes,
-   *   tampoco creamos nada;
+   * abierto / cerrado
+   * LEFT / RIGHT
+   */
+  useEffect(
+    () => {
+      if (
+        window.parent ===
+        window
+      ) {
+        return;
+      }
+
+      if (
+        !config
+      ) {
+        return;
+      }
+
+      window.parent.postMessage(
+        {
+          source:
+            'nova-widget',
+
+          type:
+            'nova:state',
+
+          open:
+            isOpen,
+
+          position:
+            config.position,
+        },
+        '*',
+      );
+    },
+    [
+      config,
+      isOpen,
+    ],
+  );
+
+  /*
+   * Al abrir:
    *
-   * - si existe una conversación real,
-   *   restauramos historial + Socket.
+   * Si nunca habló:
+   * NO se crea nada.
+   *
+   * Si ya existe sesión:
+   * restauramos historial + Socket.
    */
   async function initializeNovaSession() {
     if (
@@ -587,10 +651,11 @@ function App() {
       ChangeEvent<HTMLInputElement>,
   ) {
     const file =
-      event.target.files
-        ?.[0];
+      event.target.files?.[0];
 
-    if (!file) {
+    if (
+      !file
+    ) {
       return;
     }
 
@@ -683,15 +748,10 @@ function App() {
       );
 
       /*
-       * Si aún no existe sesión,
-       * este es el momento en que
-       * realmente creamos:
+       * PRIMER ENVÍO REAL:
        *
-       * Visitor
-       * Conversation
-       *
-       * porque el usuario ya decidió
-       * enviar algo.
+       * recién aquí se crea
+       * Visitor + Conversation.
        */
       let activeSession =
         session;
@@ -774,7 +834,9 @@ function App() {
     return null;
   }
 
-  if (!config) {
+  if (
+    !config
+  ) {
     return null;
   }
 
@@ -784,11 +846,29 @@ function App() {
       ? 'nova-widget-shell--left'
       : 'nova-widget-shell--right';
 
+  const statusClass =
+    connectionStatus ===
+    'En línea'
+      ? 'nova-chat__status nova-chat__status--online'
+      : connectionStatus ===
+            'Desconectado' ||
+          connectionStatus ===
+            'Error'
+        ? 'nova-chat__status nova-chat__status--offline'
+        : 'nova-chat__status';
+
+  const brandInitial =
+    config.title
+      .charAt(
+        0,
+      )
+      .toUpperCase();
+
   return (
     <div
       className={`nova-widget-shell ${positionClass}`}
     >
-      {isOpen && (
+      {isOpen ? (
         <section
           className="nova-chat"
           aria-label={`Chat de soporte ${config.title}`}
@@ -796,26 +876,34 @@ function App() {
           <header className="nova-chat__header">
             <div className="nova-chat__identity">
               <div className="nova-chat__avatar">
-                {config.title
-                  .charAt(
-                    0,
-                  )
-                  .toUpperCase()}
+                {
+                  brandInitial
+                }
               </div>
 
-              <div>
+              <div className="nova-chat__identity-text">
                 <h1>
-                  {config.title}
+                  {
+                    config.title
+                  }
                 </h1>
 
                 <p>
-                  {config.subtitle}
+                  {
+                    config.subtitle
+                  }
                 </p>
               </div>
             </div>
 
             <div className="nova-chat__header-actions">
-              <span className="nova-chat__status">
+              <span
+                className={
+                  statusClass
+                }
+              >
+                <span className="nova-chat__status-dot" />
+
                 {
                   connectionStatus
                 }
@@ -832,16 +920,45 @@ function App() {
                 aria-label="Minimizar chat"
                 title="Minimizar"
               >
-                ×
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M6 9l6 6 6-6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
             </div>
           </header>
 
-          <div className="nova-chat__messages">
-            <div className="nova-message nova-message--system">
-              {
-                config.welcomeMessage
-              }
+          <div
+            className="nova-chat__messages"
+            aria-live="polite"
+          >
+            <div className="nova-chat__welcome">
+              <div className="nova-chat__welcome-avatar">
+                {
+                  brandInitial
+                }
+              </div>
+
+              <div className="nova-chat__welcome-content">
+                <span>
+                  Soporte
+                </span>
+
+                <div>
+                  {
+                    config.welcomeMessage
+                  }
+                </div>
+              </div>
             </div>
 
             {messages.map(
@@ -862,21 +979,21 @@ function App() {
                   {message.type ===
                   'IMAGE' ? (
                     <>
-                      {message.mediaUrl && (
+                      {message.mediaUrl ? (
                         <img
                           src={`${NOVA_API_URL}${message.mediaUrl}`}
                           alt="Imagen enviada"
                           className="nova-message__image"
                         />
-                      )}
+                      ) : null}
 
-                      {message.content && (
+                      {message.content ? (
                         <div className="nova-message__content">
                           {
                             message.content
                           }
                         </div>
-                      )}
+                      ) : null}
                     </>
                   ) : (
                     <div className="nova-message__content">
@@ -895,11 +1012,34 @@ function App() {
               ),
             )}
 
-            {error && (
-              <div className="nova-message nova-message--error">
-                {error}
+            {error ? (
+              <div
+                className="nova-chat__error"
+                role="alert"
+              >
+                <div className="nova-chat__error-icon">
+                  !
+                </div>
+
+                <span>
+                  {
+                    error
+                  }
+                </span>
+
+                <button
+                  type="button"
+                  aria-label="Cerrar error"
+                  onClick={() => {
+                    setError(
+                      null,
+                    );
+                  }}
+                >
+                  ×
+                </button>
               </div>
-            )}
+            ) : null}
 
             <div
               ref={
@@ -908,7 +1048,7 @@ function App() {
             />
           </div>
 
-          {imagePreview && (
+          {imagePreview ? (
             <div className="nova-image-preview">
               <div className="nova-image-preview__container">
                 <img
@@ -944,88 +1084,129 @@ function App() {
                 </span>
               </div>
             </div>
-          )}
+          ) : null}
 
-          <form
-            className="nova-chat__composer"
-            onSubmit={
-              handleSubmit
-            }
-          >
-            <input
-              ref={
-                fileInputRef
+          <div className="nova-chat__composer-area">
+            <form
+              className="nova-chat__composer"
+              onSubmit={
+                handleSubmit
               }
-              className="nova-chat__file-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={
-                handleImageSelected
-              }
-            />
-
-            <button
-              type="button"
-              className="nova-chat__attach"
-              onClick={
-                openFilePicker
-              }
-              disabled={
-                sending ||
-                initializingSession
-              }
-              title="Adjuntar imagen"
-              aria-label="Adjuntar imagen"
             >
-              📎
-            </button>
-
-            <input
-              type="text"
-              value={
-                input
-              }
-              onChange={
-                (
-                  event,
-                ) => {
-                  setInput(
-                    event.target.value,
-                  );
+              <input
+                ref={
+                  fileInputRef
                 }
-              }
-              placeholder={
-                selectedImage
-                  ? 'Añade un mensaje...'
-                  : 'Escribe un mensaje...'
-              }
-              disabled={
-                sending ||
-                initializingSession
-              }
-            />
+                className="nova-chat__file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={
+                  handleImageSelected
+                }
+              />
 
-            <button
-              type="submit"
-              className="nova-chat__send"
-              disabled={
-                sending ||
-                initializingSession ||
-                (
-                  !input.trim() &&
-                  !selectedImage
-                )
-              }
-            >
-              {sending
-                ? '...'
-                : 'Enviar'}
-            </button>
-          </form>
+              <button
+                type="button"
+                className="nova-chat__attach"
+                onClick={
+                  openFilePicker
+                }
+                disabled={
+                  sending ||
+                  initializingSession
+                }
+                title="Adjuntar imagen"
+                aria-label="Adjuntar imagen"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M8.5 12.5l5.8-5.8a3 3 0 114.2 4.2l-7.9 7.9a5 5 0 01-7.1-7.1l8.4-8.4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+
+              <div className="nova-chat__input-wrap">
+                <input
+                  type="text"
+                  value={
+                    input
+                  }
+                  onChange={(
+                    event,
+                  ) => {
+                    setInput(
+                      event.target.value,
+                    );
+                  }}
+                  placeholder={
+                    selectedImage
+                      ? 'Añade un mensaje...'
+                      : 'Escribe un mensaje...'
+                  }
+                  disabled={
+                    sending ||
+                    initializingSession
+                  }
+                  aria-label="Mensaje"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="nova-chat__send"
+                disabled={
+                  sending ||
+                  initializingSession ||
+                  (
+                    !input.trim() &&
+                    !selectedImage
+                  )
+                }
+              >
+                {sending ? (
+                  <span className="nova-chat__sending">
+                    …
+                  </span>
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M5 12h13M13 6l6 6-6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+
+                <span className="nova-chat__send-label">
+                  Enviar
+                </span>
+              </button>
+            </form>
+
+            <div className="nova-chat__powered">
+              Atención mediante
+
+              <strong>
+                Nova
+              </strong>
+            </div>
+          </div>
         </section>
-      )}
-
-      {!isOpen && (
+      ) : (
         <button
           type="button"
           className="nova-launcher"
@@ -1035,8 +1216,30 @@ function App() {
           aria-label={`Abrir chat de ${config.title}`}
           title="Abrir chat"
         >
+          <span className="nova-launcher__pulse" />
+
           <span className="nova-launcher__icon">
-            💬
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                d="M5.5 5.5h13a2.5 2.5 0 012.5 2.5v7a2.5 2.5 0 01-2.5 2.5H11l-4.5 3v-3h-1A2.5 2.5 0 013 15V8a2.5 2.5 0 012.5-2.5z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              <path
+                d="M8 11.5h.01M12 11.5h.01M16 11.5h.01"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+              />
+            </svg>
           </span>
         </button>
       )}

@@ -1,7 +1,37 @@
+:root {
+  --nova-widget-primary: #2563eb;
+  --nova-widget-primary-hover: #1d4ed8;
+  --nova-widget-primary-soft: #eff6ff;
+
+  --nova-widget-bg: #f5f7fb;
+  --nova-widget-surface: #ffffff;
+
+  --nova-widget-border: #e2e8f0;
+  --nova-widget-border-strong: #cbd5e1;
+
+  --nova-widget-text: #0f172a;
+  --nova-widget-text-secondary: #475569;
+  --nova-widget-text-soft: #64748b;
+  --nova-widget-text-faint: #94a3b8;
+
+  --nova-widget-success: #16a34a;
+  --nova-widget-danger: #dc2626;
+
+  --nova-widget-shadow:
+    0 22px 65px
+    rgba(15, 23, 42, 0.18);
+}
+
 #root {
   width: 100%;
-  min-height: 100vh;
+  min-height: 100%;
 }
+
+/*
+ * =========================================================
+ * SHELL
+ * =========================================================
+ */
 
 .nova-widget-shell {
   position: fixed;
@@ -17,6 +47,25 @@
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
+
+  color:
+    var(--nova-widget-text);
+
+  -webkit-font-smoothing:
+    antialiased;
+
+  -moz-osx-font-smoothing:
+    grayscale;
+}
+
+.nova-widget-shell,
+.nova-widget-shell * {
+  box-sizing: border-box;
+}
+
+.nova-widget-shell button,
+.nova-widget-shell input {
+  font: inherit;
 }
 
 .nova-widget-shell--right {
@@ -27,27 +76,31 @@
   left: 24px;
 }
 
-.nova-widget-shell--right .nova-chat {
+.nova-widget-shell--right
+.nova-chat {
   right: 0;
   left: auto;
 }
 
-.nova-widget-shell--left .nova-chat {
+.nova-widget-shell--left
+.nova-chat {
   right: auto;
   left: 0;
 }
 
 /*
  * =========================================================
- * BOTÓN FLOTANTE
+ * LAUNCHER
  * =========================================================
  */
 
 .nova-launcher {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
 
-  display: flex;
+  position: relative;
+
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
@@ -56,43 +109,95 @@
   border: 0;
   border-radius: 50%;
 
-  background: #111827;
+  outline: none;
+
+  background:
+    var(--nova-widget-primary);
+
   color: #ffffff;
 
   box-shadow:
     0 12px 30px
-    rgba(0, 0, 0, 0.25);
+    rgba(37, 99, 235, 0.30),
+    0 4px 10px
+    rgba(15, 23, 42, 0.12);
 
   cursor: pointer;
 
   transition:
     transform 160ms ease,
-    box-shadow 160ms ease,
-    background 160ms ease;
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .nova-launcher:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform:
+    translateY(-3px);
 
-  background: #1f2937;
+  background:
+    var(--nova-widget-primary-hover);
 
   box-shadow:
-    0 16px 34px
-    rgba(0, 0, 0, 0.3);
+    0 16px 38px
+    rgba(37, 99, 235, 0.34),
+    0 6px 14px
+    rgba(15, 23, 42, 0.12);
 }
 
 .nova-launcher:active {
-  transform: scale(0.96);
+  transform:
+    translateY(0)
+    scale(0.96);
+}
+
+.nova-launcher:focus-visible {
+  box-shadow:
+    0 0 0 4px
+    rgba(37, 99, 235, 0.20),
+    0 14px 34px
+    rgba(37, 99, 235, 0.28);
 }
 
 .nova-launcher__icon {
-  font-size: 26px;
-  line-height: 1;
+  width: 29px;
+  height: 29px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nova-launcher__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.nova-launcher__pulse {
+  position: absolute;
+
+  top: 3px;
+  right: 3px;
+
+  width: 13px;
+  height: 13px;
+
+  border:
+    3px solid
+    #ffffff;
+
+  border-radius: 50%;
+
+  background:
+    #22c55e;
+
+  box-shadow:
+    0 2px 6px
+    rgba(15, 23, 42, 0.16);
 }
 
 /*
  * =========================================================
- * VENTANA PRINCIPAL
+ * CHAT
  * =========================================================
  */
 
@@ -102,39 +207,49 @@
   right: 0;
   bottom: 0;
 
-  width: 380px;
-  height: 600px;
+  width: 400px;
+  height: 640px;
 
   display: flex;
   flex-direction: column;
 
   overflow: hidden;
 
-  background: #ffffff;
+  border:
+    1px solid
+    rgba(203, 213, 225, 0.88);
 
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
+  border-radius: 20px;
+
+  background:
+    var(--nova-widget-surface);
 
   box-shadow:
-    0 22px 60px
-    rgba(0, 0, 0, 0.22);
+    var(--nova-widget-shadow);
 
   animation:
     nova-chat-open
     180ms
-    ease-out;
+    cubic-bezier(
+      0.2,
+      0.7,
+      0.3,
+      1
+    );
 }
 
 @keyframes nova-chat-open {
   from {
     opacity: 0;
+
     transform:
-      translateY(12px)
+      translateY(14px)
       scale(0.97);
   }
 
   to {
     opacity: 1;
+
     transform:
       translateY(0)
       scale(1);
@@ -148,17 +263,23 @@
  */
 
 .nova-chat__header {
+  min-height: 84px;
+
   flex-shrink: 0;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
 
-  gap: 12px;
+  gap: 14px;
 
-  padding: 16px 18px;
+  padding:
+    15px 16px
+    15px 17px;
 
-  background: #111827;
+  background:
+    var(--nova-widget-primary);
+
   color: #ffffff;
 }
 
@@ -168,112 +289,196 @@
   display: flex;
   align-items: center;
 
-  gap: 10px;
+  gap: 11px;
 }
 
 .nova-chat__avatar {
+  width: 43px;
+  height: 43px;
+
   flex-shrink: 0;
 
-  width: 36px;
-  height: 36px;
-
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
-  border-radius: 50%;
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.22);
 
-  background: #ffffff;
-  color: #111827;
+  border-radius: 13px;
 
-  font-size: 15px;
-  font-weight: 700;
+  background:
+    #ffffff;
+
+  color:
+    var(--nova-widget-primary);
+
+  font-size: 16px;
+  font-weight: 800;
+
+  box-shadow:
+    0 5px 14px
+    rgba(15, 23, 42, 0.12);
 }
 
-.nova-chat__header h1 {
+.nova-chat__identity-text {
+  min-width: 0;
+}
+
+.nova-chat__identity-text h1 {
   margin: 0;
 
-  font-size: 17px;
-  line-height: 1.2;
+  overflow: hidden;
+
+  color: #ffffff;
+
+  font-size: 16px;
+  line-height: 1.25;
+
+  font-weight: 760;
+
+  letter-spacing: -0.025em;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.nova-chat__header p {
-  margin: 3px 0 0;
+.nova-chat__identity-text p {
+  margin: 4px 0 0;
+
+  overflow: hidden;
+
+  color:
+    rgba(255, 255, 255, 0.78);
 
   font-size: 11px;
+  line-height: 1.35;
 
-  opacity: 0.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .nova-chat__header-actions {
+  flex-shrink: 0;
+
   display: flex;
   align-items: center;
 
-  gap: 8px;
+  gap: 7px;
 }
 
 .nova-chat__status {
-  padding: 5px 8px;
+  min-height: 28px;
+
+  display: inline-flex;
+  align-items: center;
+
+  gap: 6px;
+
+  padding:
+    0 9px;
+
+  border:
+    1px solid
+    rgba(255, 255, 255, 0.16);
 
   border-radius: 999px;
 
   background:
-    rgba(
-      255,
-      255,
-      255,
-      0.12
-    );
+    rgba(255, 255, 255, 0.12);
 
-  font-size: 11px;
+  color:
+    rgba(255, 255, 255, 0.88);
+
+  font-size: 9px;
+  font-weight: 700;
 
   white-space: nowrap;
 }
 
-.nova-chat__close {
-  width: 32px;
-  height: 32px;
+.nova-chat__status-dot {
+  width: 6px;
+  height: 6px;
 
-  display: flex;
+  flex-shrink: 0;
+
+  border-radius: 50%;
+
+  background:
+    #facc15;
+}
+
+.nova-chat__status--online
+.nova-chat__status-dot {
+  background:
+    #4ade80;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(74, 222, 128, 0.17);
+}
+
+.nova-chat__status--offline
+.nova-chat__status-dot {
+  background:
+    #fca5a5;
+}
+
+.nova-chat__close {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
   padding: 0;
 
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
 
-  background: transparent;
+  background:
+    transparent;
+
   color: #ffffff;
-
-  font-size: 24px;
-  font-weight: 300;
-  line-height: 1;
 
   cursor: pointer;
 
-  opacity: 0.8;
+  opacity: 0.86;
+}
+
+.nova-chat__close svg {
+  width: 20px;
+  height: 20px;
 }
 
 .nova-chat__close:hover {
   background:
-    rgba(
-      255,
-      255,
-      255,
-      0.12
-    );
+    rgba(255, 255, 255, 0.13);
 
   opacity: 1;
 }
 
+.nova-chat__close:focus-visible {
+  outline: none;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(255, 255, 255, 0.18);
+}
+
 /*
  * =========================================================
- * MENSAJES
+ * MESSAGES AREA
  * =========================================================
  */
 
 .nova-chat__messages {
+  min-height: 0;
+
   flex: 1;
 
   display: flex;
@@ -281,67 +486,170 @@
 
   gap: 10px;
 
-  padding: 18px;
+  padding:
+    18px 16px;
 
   overflow-x: hidden;
   overflow-y: auto;
 
-  background: #f9fafb;
+  background:
+    #f5f7fb;
 
   scroll-behavior: smooth;
+
+  scrollbar-width: thin;
+
+  scrollbar-color:
+    #cbd5e1
+    transparent;
 }
+
+/*
+ * WELCOME
+ */
+
+.nova-chat__welcome {
+  display: flex;
+  align-items: flex-end;
+
+  gap: 8px;
+
+  margin:
+    2px 0 7px;
+}
+
+.nova-chat__welcome-avatar {
+  width: 29px;
+  height: 29px;
+
+  flex-shrink: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border:
+    1px solid
+    #dbeafe;
+
+  border-radius: 9px;
+
+  background:
+    var(--nova-widget-primary-soft);
+
+  color:
+    var(--nova-widget-primary);
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.nova-chat__welcome-content {
+  max-width: 78%;
+}
+
+.nova-chat__welcome-content >
+span {
+  display: block;
+
+  margin:
+    0 0 4px
+    3px;
+
+  color:
+    var(--nova-widget-text-faint);
+
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.nova-chat__welcome-content >
+div {
+  padding:
+    10px 12px;
+
+  border:
+    1px solid
+    var(--nova-widget-border);
+
+  border-radius:
+    14px
+    14px
+    14px
+    4px;
+
+  background:
+    #ffffff;
+
+  color:
+    var(--nova-widget-text);
+
+  font-size: 13px;
+  line-height: 1.5;
+
+  box-shadow:
+    0 2px 8px
+    rgba(15, 23, 42, 0.04);
+}
+
+/*
+ * MESSAGE BUBBLES
+ */
 
 .nova-message {
-  max-width: 80%;
+  max-width: 79%;
 
-  padding: 9px 11px;
+  padding:
+    10px 12px;
 
-  border-radius: 13px;
+  border-radius: 15px;
 
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.5;
 
   word-break: break-word;
-}
 
-.nova-message--system {
-  align-self: flex-start;
-
-  background: #ffffff;
-  color: #111827;
-
-  border: 1px solid #e5e7eb;
+  box-shadow:
+    0 2px 8px
+    rgba(15, 23, 42, 0.04);
 }
 
 .nova-message--visitor {
   align-self: flex-end;
 
-  background: #111827;
-  color: #ffffff;
+  border:
+    1px solid
+    var(--nova-widget-primary);
 
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius:
+    5px;
+
+  background:
+    var(--nova-widget-primary);
+
+  color:
+    #ffffff;
+
+  box-shadow:
+    0 5px 14px
+    rgba(37, 99, 235, 0.13);
 }
 
 .nova-message--agent {
   align-self: flex-start;
 
-  background: #ffffff;
-  color: #111827;
+  border:
+    1px solid
+    var(--nova-widget-border);
 
-  border: 1px solid #e5e7eb;
+  border-bottom-left-radius:
+    5px;
 
-  border-bottom-left-radius: 4px;
-}
+  background:
+    #ffffff;
 
-.nova-message--error {
-  align-self: center;
-
-  max-width: 100%;
-
-  background: #fee2e2;
-  color: #991b1b;
-
-  font-size: 12px;
+  color:
+    var(--nova-widget-text);
 }
 
 .nova-message__content {
@@ -349,41 +657,131 @@
 }
 
 .nova-message__time {
-  margin-top: 4px;
+  margin-top: 5px;
 
-  font-size: 10px;
+  font-size: 9px;
   line-height: 1;
 
   text-align: right;
 
-  opacity: 0.6;
+  opacity: 0.58;
 }
 
 .nova-message--agent
 .nova-message__time {
-  color: #6b7280;
+  color:
+    var(--nova-widget-text-soft);
 }
 
 .nova-message--visitor
 .nova-message__time {
-  color: #ffffff;
+  color:
+    #ffffff;
 }
 
 .nova-message__image {
   display: block;
 
   width: 100%;
-  max-width: 250px;
-  max-height: 250px;
+
+  max-width: 270px;
+  max-height: 280px;
+
+  margin-bottom: 7px;
+
+  border-radius: 10px;
 
   object-fit: contain;
+}
 
-  border-radius: 8px;
+/*
+ * ERROR
+ */
+
+.nova-chat__error {
+  width: 100%;
+
+  display: flex;
+  align-items: flex-start;
+
+  gap: 8px;
+
+  margin-top: 3px;
+  padding:
+    9px 10px;
+
+  border:
+    1px solid
+    #fecaca;
+
+  border-radius: 10px;
+
+  background:
+    #fef2f2;
+
+  color:
+    #991b1b;
+
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.nova-chat__error-icon {
+  width: 19px;
+  height: 19px;
+
+  flex-shrink: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background:
+    #fee2e2;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.nova-chat__error >
+span {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.nova-chat__error >
+button {
+  width: 20px;
+  height: 20px;
+
+  flex-shrink: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 0;
+  border-radius: 5px;
+
+  background:
+    transparent;
+
+  color:
+    inherit;
+
+  font-size: 16px;
+
+  cursor: pointer;
 }
 
 /*
  * =========================================================
- * PREVIEW DE IMAGEN
+ * IMAGE PREVIEW
  * =========================================================
  */
 
@@ -393,14 +791,17 @@
   display: flex;
   align-items: center;
 
-  gap: 12px;
+  gap: 11px;
 
-  padding: 10px 14px;
+  padding:
+    10px 14px;
 
   border-top:
-    1px solid #e5e7eb;
+    1px solid
+    var(--nova-widget-border);
 
-  background: #ffffff;
+  background:
+    #ffffff;
 }
 
 .nova-image-preview__container {
@@ -412,13 +813,14 @@
 .nova-image-preview__image {
   display: block;
 
-  width: 62px;
-  height: 62px;
+  width: 56px;
+  height: 56px;
 
   object-fit: cover;
 
   border:
-    1px solid #e5e7eb;
+    1px solid
+    var(--nova-widget-border);
 
   border-radius: 10px;
 }
@@ -432,22 +834,31 @@
   width: 22px;
   height: 22px;
 
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
   padding: 0;
 
-  border: 0;
+  border:
+    2px solid
+    #ffffff;
+
   border-radius: 50%;
 
-  background: #111827;
+  background:
+    var(--nova-widget-text);
+
   color: #ffffff;
 
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
 
   cursor: pointer;
+
+  box-shadow:
+    0 2px 6px
+    rgba(15, 23, 42, 0.16);
 }
 
 .nova-image-preview__info {
@@ -457,18 +868,24 @@
   flex-direction: column;
 
   gap: 3px;
+}
 
-  color: #111827;
+.nova-image-preview__info strong {
+  color:
+    var(--nova-widget-text);
 
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .nova-image-preview__info span {
-  max-width: 210px;
+  max-width: 250px;
 
   overflow: hidden;
 
-  color: #6b7280;
+  color:
+    var(--nova-widget-text-soft);
+
+  font-size: 10px;
 
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -480,142 +897,246 @@
  * =========================================================
  */
 
-.nova-chat__composer {
+.nova-chat__composer-area {
   flex-shrink: 0;
 
+  border-top:
+    1px solid
+    var(--nova-widget-border);
+
+  background:
+    #ffffff;
+}
+
+.nova-chat__composer {
   display: flex;
   align-items: center;
 
-  gap: 8px;
+  gap: 7px;
 
-  padding: 12px;
-
-  border-top:
-    1px solid #e5e7eb;
-
-  background: #ffffff;
+  padding:
+    11px 11px
+    7px;
 }
 
 .nova-chat__file-input {
   display: none;
 }
 
-.nova-chat__composer
-input[type='text'] {
-  flex: 1;
-
+.nova-chat__input-wrap {
   min-width: 0;
 
-  padding: 10px 11px;
+  flex: 1;
+}
+
+.nova-chat__input-wrap
+input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+
+  padding:
+    10px 11px;
 
   border:
-    1px solid #d1d5db;
+    1px solid
+    var(--nova-widget-border-strong);
 
-  border-radius: 10px;
+  border-radius: 11px;
 
   outline: none;
 
-  background: #ffffff;
-  color: #111827;
+  background:
+    #ffffff;
 
-  font: inherit;
+  color:
+    var(--nova-widget-text);
+
+  font-size: 12px;
+  line-height: 1.4;
 }
 
-.nova-chat__composer
-input[type='text']:focus {
-  border-color: #111827;
+.nova-chat__input-wrap
+input::placeholder {
+  color:
+    var(--nova-widget-text-faint);
 }
 
-.nova-chat__composer
-input[type='text']::placeholder {
-  color: #9ca3af;
+.nova-chat__input-wrap
+input:hover:not(:disabled) {
+  border-color:
+    #94a3b8;
+}
+
+.nova-chat__input-wrap
+input:focus {
+  border-color:
+    var(--nova-widget-primary);
+
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 99, 235, 0.10);
 }
 
 .nova-chat__attach {
+  width: 42px;
+  height: 42px;
+
   flex-shrink: 0;
 
-  width: 40px;
-  height: 40px;
-
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 
   padding: 0;
 
   border:
-    1px solid #d1d5db;
+    1px solid
+    var(--nova-widget-border);
 
-  border-radius: 10px;
+  border-radius: 11px;
 
-  background: #ffffff;
-  color: #111827;
+  background:
+    #ffffff;
 
-  font-size: 18px;
+  color:
+    var(--nova-widget-text-secondary);
 
   cursor: pointer;
+}
+
+.nova-chat__attach svg {
+  width: 19px;
+  height: 19px;
 }
 
 .nova-chat__attach:hover:not(:disabled) {
-  background: #f3f4f6;
+  border-color:
+    #bfdbfe;
+
+  background:
+    var(--nova-widget-primary-soft);
+
+  color:
+    var(--nova-widget-primary);
 }
 
 .nova-chat__send {
+  min-width: 44px;
+  min-height: 42px;
+
   flex-shrink: 0;
 
-  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-  padding: 0 14px;
+  gap: 5px;
 
-  border: 0;
-  border-radius: 10px;
+  padding:
+    0 12px;
 
-  background: #111827;
-  color: #ffffff;
+  border:
+    1px solid
+    var(--nova-widget-primary);
 
-  font: inherit;
+  border-radius: 11px;
+
+  background:
+    var(--nova-widget-primary);
+
+  color:
+    #ffffff;
+
+  font-size: 10px;
+  font-weight: 700;
 
   cursor: pointer;
+
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.nova-chat__send svg {
+  width: 17px;
+  height: 17px;
 }
 
 .nova-chat__send:hover:not(:disabled) {
-  background: #1f2937;
+  border-color:
+    var(--nova-widget-primary-hover);
+
+  background:
+    var(--nova-widget-primary-hover);
+
+  box-shadow:
+    0 4px 12px
+    rgba(37, 99, 235, 0.16);
 }
 
 .nova-chat__send:disabled,
 .nova-chat__attach:disabled,
-.nova-chat__composer
+.nova-chat__input-wrap
 input:disabled {
-  opacity: 0.5;
+  opacity: 0.48;
 
   cursor: not-allowed;
+
+  box-shadow: none;
+}
+
+.nova-chat__sending {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.nova-chat__powered {
+  padding:
+    0 12px
+    8px;
+
+  color:
+    var(--nova-widget-text-faint);
+
+  font-size: 8px;
+
+  text-align: center;
+}
+
+.nova-chat__powered strong {
+  margin-left: 3px;
+
+  color:
+    var(--nova-widget-text-soft);
+
+  font-weight: 750;
 }
 
 /*
  * =========================================================
- * MÓVIL
+ * TABLETS / SMALL WINDOWS
  * =========================================================
  */
 
-@media (max-width: 520px) {
-.nova-widget-shell {
-  bottom: 16px;
-}
+@media (
+  max-width: 520px
+) {
+  .nova-widget-shell {
+    bottom: 16px;
+  }
 
-.nova-widget-shell--right {
-  right: 16px;
-  left: auto;
-}
+  .nova-widget-shell--right {
+    right: 16px;
+    left: auto;
+  }
 
-.nova-widget-shell--left {
-  right: auto;
-  left: 16px;
-}
+  .nova-widget-shell--left {
+    right: auto;
+    left: 16px;
+  }
 
-  /*
-   * En móvil, al abrir Nova usamos
-   * prácticamente toda la pantalla.
-   */
   .nova-chat {
     position: fixed;
 
@@ -634,99 +1155,165 @@ input:disabled {
   }
 
   .nova-chat__header {
+    min-height: 76px;
+
     padding:
-      max(14px, env(safe-area-inset-top))
-      16px
-      14px;
+      max(
+        13px,
+        env(
+          safe-area-inset-top
+        )
+      )
+      14px
+      13px;
   }
 
-  .nova-chat__messages {
-    padding: 14px;
+  .nova-chat__avatar {
+    width: 40px;
+    height: 40px;
 
-    overscroll-behavior: contain;
+    border-radius: 12px;
   }
 
-  .nova-message {
-    max-width: 86%;
+  .nova-chat__identity-text h1 {
+    font-size: 15px;
   }
 
-  .nova-message__image {
-    max-width: min(280px, 72vw);
-    max-height: 320px;
-  }
-
-  .nova-chat__composer {
-    padding:
-      10px
-      10px
-      max(10px, env(safe-area-inset-bottom));
-  }
-
-  /*
-   * 16px evita que algunos navegadores
-   * móviles hagan zoom automático al
-   * pulsar el input.
-   */
-  .nova-chat__composer
-  input[type='text'] {
-    font-size: 16px;
-  }
-
-  .nova-chat__attach {
-    width: 42px;
-    height: 42px;
-  }
-
-  .nova-chat__send {
-    min-height: 42px;
+  .nova-chat__identity-text p {
+    font-size: 10px;
   }
 
   .nova-chat__status {
     display: none;
   }
 
+  .nova-chat__messages {
+    padding:
+      15px 13px;
+
+    overscroll-behavior:
+      contain;
+  }
+
+  .nova-message {
+    max-width: 86%;
+
+    font-size: 13px;
+  }
+
+  .nova-chat__welcome-content {
+    max-width: 84%;
+  }
+
+  .nova-message__image {
+    max-width:
+      min(
+        280px,
+        72vw
+      );
+
+    max-height: 320px;
+  }
+
+  .nova-chat__composer {
+    padding:
+      9px 9px
+      5px;
+  }
+
+  /*
+   * 16px evita zoom automático
+   * en iOS al enfocar el input.
+   */
+  .nova-chat__input-wrap
+  input {
+    min-height: 44px;
+
+    font-size: 16px;
+  }
+
+  .nova-chat__attach {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nova-chat__send {
+    min-height: 44px;
+
+    padding:
+      0 13px;
+  }
+
   .nova-launcher {
-    width: 58px;
-    height: 58px;
+    width: 60px;
+    height: 60px;
   }
 
   .nova-launcher__icon {
-    font-size: 25px;
+    width: 27px;
+    height: 27px;
   }
 
   .nova-image-preview {
-    padding: 9px 12px;
+    padding:
+      9px 12px;
   }
 
   .nova-image-preview__image {
-    width: 56px;
-    height: 56px;
+    width: 54px;
+    height: 54px;
   }
 
   .nova-image-preview__info span {
     max-width: 55vw;
   }
+
+  .nova-chat__powered {
+    padding-bottom:
+      max(
+        7px,
+        env(
+          safe-area-inset-bottom
+        )
+      );
+  }
 }
 
 /*
- * Teléfonos especialmente pequeños.
+ * =========================================================
+ * VERY SMALL PHONES
+ * =========================================================
  */
-@media (max-width: 360px) {
+
+@media (
+  max-width: 360px
+) {
   .nova-chat__header {
-    padding-left: 12px;
-    padding-right: 12px;
+    padding-left: 11px;
+    padding-right: 11px;
   }
 
   .nova-chat__messages {
-    padding: 12px;
+    padding:
+      12px 10px;
   }
 
   .nova-chat__composer {
-    gap: 6px;
+    gap: 5px;
+
+    padding-left: 7px;
+    padding-right: 7px;
   }
 
   .nova-chat__send {
-    padding: 0 11px;
+    min-width: 42px;
+
+    padding:
+      0 9px;
+  }
+
+  .nova-chat__send-label {
+    display: none;
   }
 
   .nova-message {
