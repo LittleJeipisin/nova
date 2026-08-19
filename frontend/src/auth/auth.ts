@@ -41,28 +41,38 @@ type JwtPayload = {
 };
 
 type AccessTokenListener = (
-  accessToken: string | null,
+  accessToken:
+    string | null,
 ) => void;
 
 const accessTokenListeners =
-  new Set<AccessTokenListener>();
+  new Set<
+    AccessTokenListener
+  >();
 
 let refreshPromise:
-  Promise<string> | null = null;
+  Promise<string> | null =
+    null;
 
 async function getErrorMessage(
   response: Response,
   fallbackMessage: string,
 ) {
-  const data: unknown =
-    await response
-      .json()
-      .catch(() => null);
+  const data:
+    unknown =
+      await response
+        .json()
+        .catch(
+          () => null,
+        );
 
   if (
-    typeof data === 'object' &&
-    data !== null &&
-    'message' in data
+    typeof data ===
+      'object' &&
+    data !==
+      null &&
+    'message' in
+      data
   ) {
     const message = (
       data as {
@@ -78,9 +88,13 @@ async function getErrorMessage(
     }
 
     if (
-      Array.isArray(message) &&
+      Array.isArray(
+        message,
+      ) &&
       message.every(
-        (item) =>
+        (
+          item,
+        ) =>
           typeof item ===
           'string',
       )
@@ -95,7 +109,8 @@ async function getErrorMessage(
 }
 
 function notifyAccessTokenListeners(
-  accessToken: string | null,
+  accessToken:
+    string | null,
 ) {
   for (
     const listener
@@ -140,13 +155,16 @@ export function clearAccessToken() {
   const hadAccessToken =
     localStorage.getItem(
       ACCESS_TOKEN_KEY,
-    ) !== null;
+    ) !==
+    null;
 
   localStorage.removeItem(
     ACCESS_TOKEN_KEY,
   );
 
-  if (hadAccessToken) {
+  if (
+    hadAccessToken
+  ) {
     notifyAccessTokenListeners(
       null,
     );
@@ -154,7 +172,8 @@ export function clearAccessToken() {
 }
 
 export function subscribeAccessTokenChange(
-  listener: AccessTokenListener,
+  listener:
+    AccessTokenListener,
 ) {
   accessTokenListeners.add(
     listener,
@@ -175,7 +194,10 @@ function getJwtExpiration(
       '.',
     );
 
-  if (parts.length !== 3) {
+  if (
+    parts.length !==
+    3
+  ) {
     return null;
   }
 
@@ -197,8 +219,10 @@ function getJwtExpiration(
     const paddedBase64 =
       base64.padEnd(
         Math.ceil(
-          base64.length / 4,
+          base64.length /
+            4,
         ) * 4,
+
         '=',
       );
 
@@ -215,13 +239,15 @@ function getJwtExpiration(
     if (
       typeof payload !==
         'object' ||
-      payload === null
+      payload ===
+        null
     ) {
       return null;
     }
 
     const exp = (
-      payload as JwtPayload
+      payload as
+        JwtPayload
     ).exp;
 
     if (
@@ -245,13 +271,17 @@ function shouldRefreshAccessToken(
       accessToken,
     );
 
-  if (expiration === null) {
+  if (
+    expiration ===
+    null
+  ) {
     return true;
   }
 
   const currentTimeSeconds =
     Math.floor(
-      Date.now() / 1000,
+      Date.now() /
+        1000,
     );
 
   return (
@@ -266,14 +296,17 @@ async function executeRefresh() {
     await fetch(
       `${NOVA_API_URL}/auth/refresh`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         credentials:
           'include',
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     clearAccessToken();
 
     throw new Error(
@@ -284,10 +317,9 @@ async function executeRefresh() {
     );
   }
 
-  const data =
-    (
-      await response.json()
-    ) as LoginResponse;
+  const data = (
+    await response.json()
+  ) as LoginResponse;
 
   saveAccessToken(
     data.accessToken,
@@ -297,7 +329,9 @@ async function executeRefresh() {
 }
 
 export function refreshAccessToken() {
-  if (!refreshPromise) {
+  if (
+    !refreshPromise
+  ) {
     refreshPromise =
       executeRefresh()
         .finally(
@@ -312,7 +346,8 @@ export function refreshAccessToken() {
 }
 
 export async function getValidAccessToken(
-  preferredAccessToken?: string,
+  preferredAccessToken?:
+    string,
 ) {
   const storedAccessToken =
     getStoredAccessToken();
@@ -343,9 +378,14 @@ export async function getValidAccessToken(
 }
 
 async function fetchWithAccessToken(
-  input: RequestInfo | URL,
-  init: RequestInit,
-  accessToken: string,
+  input:
+    RequestInfo | URL,
+
+  init:
+    RequestInit,
+
+  accessToken:
+    string,
 ) {
   const headers =
     new Headers(
@@ -372,9 +412,14 @@ async function fetchWithAccessToken(
 }
 
 export async function authFetch(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-  preferredAccessToken?: string,
+  input:
+    RequestInfo | URL,
+
+  init:
+    RequestInit = {},
+
+  preferredAccessToken?:
+    string,
 ) {
   const accessToken =
     await getValidAccessToken(
@@ -396,10 +441,12 @@ export async function authFetch(
   }
 
   /*
-   * Puede ocurrir que el token haya sido
-   * invalidado justo después de comprobarlo.
+   * Puede ocurrir que el token
+   * haya sido invalidado justo
+   * después de comprobarlo.
    *
-   * Intentamos un refresh una sola vez.
+   * Intentamos un refresh una
+   * sola vez.
    */
   try {
     const newAccessToken =
@@ -413,11 +460,13 @@ export async function authFetch(
       );
   } catch {
     /*
-     * refreshAccessToken ya limpió
-     * el access token local.
+     * refreshAccessToken ya
+     * limpió el access token
+     * local.
      *
-     * Conservamos la respuesta original
-     * para que el caller maneje el 401.
+     * Conservamos la respuesta
+     * original para que el caller
+     * maneje el 401.
      */
   }
 
@@ -425,7 +474,8 @@ export async function authFetch(
 }
 
 export async function login(
-  input: LoginInput,
+  input:
+    LoginInput,
 ) {
   const body: {
     username: string;
@@ -440,9 +490,12 @@ export async function login(
   };
 
   const workspaceSlug =
-    input.workspaceSlug?.trim();
+    input.workspaceSlug
+      ?.trim();
 
-  if (workspaceSlug) {
+  if (
+    workspaceSlug
+  ) {
     body.workspaceSlug =
       workspaceSlug;
   }
@@ -451,7 +504,8 @@ export async function login(
     await fetch(
       `${NOVA_API_URL}/auth/login`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         headers: {
           'Content-Type':
@@ -468,7 +522,9 @@ export async function login(
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       await getErrorMessage(
         response,
@@ -483,18 +539,23 @@ export async function login(
 }
 
 export async function getMe(
-  accessToken: string,
+  accessToken:
+    string,
 ) {
   const response =
     await authFetch(
       `${NOVA_API_URL}/auth/me`,
       {
-        method: 'GET',
+        method:
+          'GET',
       },
+
       accessToken,
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       await getErrorMessage(
         response,
@@ -509,15 +570,18 @@ export async function getMe(
 }
 
 export async function changePassword(
-  accessToken: string,
-  currentPassword: string,
-  newPassword: string,
+  accessToken:
+    string,
+
+  newPassword:
+    string,
 ) {
   const response =
     await authFetch(
       `${NOVA_API_URL}/auth/change-password`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         headers: {
           'Content-Type':
@@ -526,14 +590,16 @@ export async function changePassword(
 
         body:
           JSON.stringify({
-            currentPassword,
             newPassword,
           }),
       },
+
       accessToken,
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       await getErrorMessage(
         response,
@@ -554,7 +620,8 @@ export async function logout() {
     await fetch(
       `${NOVA_API_URL}/auth/logout`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         credentials:
           'include',
@@ -571,7 +638,9 @@ if (
 ) {
   window.addEventListener(
     'storage',
-    (event) => {
+    (
+      event,
+    ) => {
       if (
         event.key !==
         ACCESS_TOKEN_KEY

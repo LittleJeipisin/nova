@@ -486,17 +486,24 @@ export class ConversationsService {
       updatedConversation,
     );
 
+    /*
+     * Primero avisamos al nuevo agente
+     * que la conversación ahora le pertenece.
+     *
+     * Después la retiramos de la bandeja
+     * de conversaciones sin asignar.
+     */
+    this.realtimeService.emitConversationUpdatedToUser(
+      agent.id,
+      updatedConversation,
+    );
+
     if (!previousAgentId) {
       this.realtimeService.emitConversationRemovedFromUnassigned(
         workspaceId,
         conversation.id,
       );
     }
-
-    this.realtimeService.emitConversationUpdatedToUser(
-      agent.id,
-      updatedConversation,
-    );
 
     if (previousAgentId && previousAgentId !== agent.id) {
       this.realtimeService.emitConversationRemovedFromUser(

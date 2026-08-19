@@ -12,6 +12,7 @@ import {
 import type { CookieOptions, Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
+
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 const REFRESH_COOKIE_NAME = 'nova_refresh_token';
@@ -32,8 +33,11 @@ type AuthenticatedRequest = Request & {
 function getRefreshCookieBaseOptions(): CookieOptions {
   return {
     httpOnly: true,
+
     sameSite: 'lax',
+
     secure: process.env.NODE_ENV === 'production',
+
     path: '/auth',
   };
 }
@@ -165,16 +169,22 @@ export class AuthController {
     @Req()
     request: AuthenticatedRequest,
 
-    @Body('currentPassword')
-    currentPassword: string,
-
     @Body('newPassword')
     newPassword: string,
   ) {
-    return this.authService.changePassword(
-      request.user.userId,
-      currentPassword,
-      newPassword,
-    );
+    /*
+     * El usuario ya se autenticó
+     * correctamente en /auth/login
+     * utilizando su contraseña
+     * temporal.
+     *
+     * No volvemos a solicitarla.
+     *
+     * AuthService verificará además
+     * directamente en BD que esta
+     * cuenta realmente tenga
+     * mustChangePassword = true.
+     */
+    return this.authService.changePassword(request.user.userId, newPassword);
   }
 }

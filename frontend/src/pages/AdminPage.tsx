@@ -105,6 +105,7 @@ export function AdminPage({
 }: AdminPageProps) {
   const workspaceId =
     user.workspaceId ?? '';
+
   const activeConversationIdRef =
     useRef<string | null>(
       null,
@@ -177,84 +178,96 @@ export function AdminPage({
       string | null
     >(null);
 
-const [
-  newAgentUsername,
-  setNewAgentUsername,
-] = useState('');
-
-const [
-  creatingAgent,
-  setCreatingAgent,
-] = useState(false);
-
-const [
-  managingUserId,
-  setManagingUserId,
-] =
-  useState<string | null>(
+  const [
+    notification,
+    setNotification,
+  ] = useState<string | null>(
     null,
   );
 
-const [
-  createdAgent,
-  setCreatedAgent,
-] =
-  useState<{
-    username: string;
-    password: string;
-  } | null>(null);
+  const notificationTimeoutRef =
+    useRef<number | null>(
+      null,
+    );
 
-const [
-  newAdminUsername,
-  setNewAdminUsername,
-] = useState('');
+  const [
+    newAgentUsername,
+    setNewAgentUsername,
+  ] = useState('');
 
-const [
-  selectedAdminSiteId,
-  setSelectedAdminSiteId,
-] = useState('');
+  const [
+    creatingAgent,
+    setCreatingAgent,
+  ] = useState(false);
 
-const [
-  newSiteName,
-  setNewSiteName,
-] = useState('');
+  const [
+    managingUserId,
+    setManagingUserId,
+  ] =
+    useState<string | null>(
+      null,
+    );
 
-const [
-  newSiteSlug,
-  setNewSiteSlug,
-] = useState('');
+  const [
+    createdAgent,
+    setCreatedAgent,
+  ] =
+    useState<{
+      username: string;
+      password: string;
+    } | null>(null);
 
-const [
-  newSiteDomain,
-  setNewSiteDomain,
-] = useState('');
+  const [
+    newAdminUsername,
+    setNewAdminUsername,
+  ] = useState('');
 
-const [
-  creatingSite,
-  setCreatingSite,
-] = useState(false);
+  const [
+    selectedAdminSiteId,
+    setSelectedAdminSiteId,
+  ] = useState('');
 
-const [
-  managingSiteId,
-  setManagingSiteId,
-] =
-  useState<string | null>(
-    null,
-  );
+  const [
+    newSiteName,
+    setNewSiteName,
+  ] = useState('');
 
-const [
-  creatingAdmin,
-  setCreatingAdmin,
-] = useState(false);
+  const [
+    newSiteSlug,
+    setNewSiteSlug,
+  ] = useState('');
 
-const [
-  createdAdmin,
-  setCreatedAdmin,
-] =
-  useState<{
-    username: string;
-    password: string;
-  } | null>(null);
+  const [
+    newSiteDomain,
+    setNewSiteDomain,
+  ] = useState('');
+
+  const [
+    creatingSite,
+    setCreatingSite,
+  ] = useState(false);
+
+  const [
+    managingSiteId,
+    setManagingSiteId,
+  ] =
+    useState<string | null>(
+      null,
+    );
+
+  const [
+    creatingAdmin,
+    setCreatingAdmin,
+  ] = useState(false);
+
+  const [
+    createdAdmin,
+    setCreatedAdmin,
+  ] =
+    useState<{
+      username: string;
+      password: string;
+    } | null>(null);
 
   const agents =
     users.filter(
@@ -265,53 +278,99 @@ const [
           'ACTIVE',
     );
 
-const allAgents =
-  users.filter(
-    (workspaceUser) =>
-      workspaceUser.role ===
-      'AGENT',
-  );
+  const allAgents =
+    users.filter(
+      (workspaceUser) =>
+        workspaceUser.role ===
+        'AGENT',
+    );
 
-const admins =
-  users.filter(
-    (workspaceUser) =>
-      workspaceUser.role ===
-      'ADMIN',
-  );
+  const admins =
+    users.filter(
+      (workspaceUser) =>
+        workspaceUser.role ===
+        'ADMIN',
+    );
 
-const activeSites =
-  sites.filter(
-    (site) =>
-      site.status ===
-      'ACTIVE',
-  );
+  const activeSites =
+    sites.filter(
+      (site) =>
+        site.status ===
+        'ACTIVE',
+    );
 
-function getSiteName(
-  siteId: string | null,
-) {
-  if (!siteId) {
-    return 'Sin página';
+  function getSiteName(
+    siteId: string | null,
+  ) {
+    if (!siteId) {
+      return 'Sin página';
+    }
+
+    return (
+      sites.find(
+        (site) =>
+          site.id === siteId,
+      )?.name ??
+      'Página desconocida'
+    );
   }
 
-  return (
-    sites.find(
-      (site) =>
-        site.id === siteId,
-    )?.name ??
-    'Página desconocida'
-  );
-}
+  function showNotification(
+    message: string,
+  ) {
+    if (
+      notificationTimeoutRef.current !==
+      null
+    ) {
+      window.clearTimeout(
+        notificationTimeoutRef.current,
+      );
+    }
 
-useEffect(
-  () => {
-    activeConversationIdRef.current =
-      activeConversation?.id ??
-      null;
-  },
-  [
-    activeConversation?.id,
-  ],
-);
+    setNotification(
+      message,
+    );
+
+    notificationTimeoutRef.current =
+      window.setTimeout(
+        () => {
+          setNotification(
+            null,
+          );
+
+          notificationTimeoutRef.current =
+            null;
+        },
+        4000,
+      );
+  }
+
+  useEffect(
+    () => {
+      return () => {
+        if (
+          notificationTimeoutRef.current !==
+          null
+        ) {
+          window.clearTimeout(
+            notificationTimeoutRef.current,
+          );
+        }
+      };
+    },
+    [],
+  );
+
+  useEffect(
+    () => {
+      activeConversationIdRef.current =
+        activeConversation?.id ??
+        null;
+    },
+    [
+      activeConversation?.id,
+    ],
+  );
 
   async function loadData() {
     if (!workspaceId) {
@@ -409,283 +468,281 @@ useEffect(
   }, [workspaceId]);
 
   useEffect(
-  () => {
-    if (
-      !workspaceId ||
-      (
-        user.role !==
-          'OWNER' &&
-        user.role !==
-          'ADMIN'
-      )
-    ) {
-      return;
-    }
-
-    const accessToken =
-      getStoredAccessToken() ??
-      '';
-
-    if (!accessToken) {
-      onLogout();
-
-      return;
-    }
-
-    let cancelled =
-      false;
-
-    async function syncConversations() {
-      try {
-        const validAccessToken =
-          await getValidAccessToken(
-            getStoredAccessToken() ??
-              undefined,
-          );
-
-        const latestConversations =
-          await getConversations(
-            validAccessToken,
-            workspaceId,
-          );
-
-        if (cancelled) {
-          return;
-        }
-
-        setConversations(
-          sortConversations(
-            latestConversations,
-          ),
-        );
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(
-          'No se pudo resincronizar la bandeja administrativa:',
-          err,
-        );
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No se pudieron actualizar las conversaciones',
-        );
+    () => {
+      if (
+        !workspaceId ||
+        (
+          user.role !==
+            'OWNER' &&
+          user.role !==
+            'ADMIN'
+        )
+      ) {
+        return;
       }
-    }
 
-    async function refreshOpenConversation(
-      conversationId: string,
-    ) {
-      try {
-        const validAccessToken =
-          await getValidAccessToken(
-            getStoredAccessToken() ??
-              undefined,
-          );
+      const accessToken =
+        getStoredAccessToken() ??
+        '';
 
-        const conversation =
-          await getConversation(
-            validAccessToken,
-            workspaceId,
-            conversationId,
-          );
+      if (!accessToken) {
+        onLogout();
 
-        if (
-          cancelled ||
-          activeConversationIdRef
-            .current !==
-            conversationId
-        ) {
-          return;
-        }
-
-        setActiveConversation(
-          conversation,
-        );
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(
-          'No se pudo actualizar el chat abierto:',
-          err,
-        );
+        return;
       }
-    }
 
-    const socket =
-      connectAgentSocket(
-        accessToken,
-        workspaceId,
-        {
-          onWorkspaceJoined() {
-            if (cancelled) {
-              return;
-            }
+      let cancelled =
+        false;
 
-            /*
-             * Socket no es retroactivo.
-             *
-             * Cada vez que conecta o
-             * reconecta, sincronizamos
-             * nuevamente mediante REST.
-             */
-            void syncConversations();
-          },
+      async function syncConversations() {
+        try {
+          const validAccessToken =
+            await getValidAccessToken(
+              getStoredAccessToken() ??
+                undefined,
+            );
 
-          onConversationUpdated(
+          const latestConversations =
+            await getConversations(
+              validAccessToken,
+              workspaceId,
+            );
+
+          if (cancelled) {
+            return;
+          }
+
+          setConversations(
+            sortConversations(
+              latestConversations,
+            ),
+          );
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            'No se pudo resincronizar la bandeja administrativa:',
+            err,
+          );
+
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'No se pudieron actualizar las conversaciones',
+          );
+        }
+      }
+
+      async function refreshOpenConversation(
+        conversationId: string,
+      ) {
+        try {
+          const validAccessToken =
+            await getValidAccessToken(
+              getStoredAccessToken() ??
+                undefined,
+            );
+
+          const conversation =
+            await getConversation(
+              validAccessToken,
+              workspaceId,
+              conversationId,
+            );
+
+          if (
+            cancelled ||
+            activeConversationIdRef
+              .current !==
+              conversationId
+          ) {
+            return;
+          }
+
+          setActiveConversation(
             conversation,
-          ) {
-            if (cancelled) {
-              return;
-            }
+          );
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
 
-            /*
-             * Añadimos una conversación
-             * nueva o reemplazamos una
-             * existente.
-             */
-            setConversations(
-              (
-                currentConversations,
-              ) => {
-                const withoutCurrent =
-                  currentConversations.filter(
-                    (
-                      current,
-                    ) =>
-                      current.id !==
-                      conversation.id,
-                  );
+          console.error(
+            'No se pudo actualizar el chat abierto:',
+            err,
+          );
+        }
+      }
 
-                return sortConversations([
-                  conversation,
-                  ...withoutCurrent,
-                ]);
-              },
-            );
+      const socket =
+        connectAgentSocket(
+          accessToken,
+          workspaceId,
+          {
+            onWorkspaceJoined() {
+              if (cancelled) {
+                return;
+              }
 
-            /*
-             * El evento contiene el resumen.
-             *
-             * Si tenemos ese chat abierto,
-             * pedimos el detalle completo
-             * para actualizar también los
-             * mensajes.
-             */
-            if (
-              activeConversationIdRef
-                .current ===
-              conversation.id
+              /*
+               * Socket no es retroactivo.
+               *
+               * Cada vez que conecta o
+               * reconecta, sincronizamos
+               * nuevamente mediante REST.
+               */
+              void syncConversations();
+            },
+
+            onConversationUpdated(
+              conversation,
             ) {
-              void refreshOpenConversation(
-                conversation.id,
+              if (cancelled) {
+                return;
+              }
+
+              /*
+               * Añadimos una conversación
+               * nueva o reemplazamos una
+               * existente.
+               */
+              setConversations(
+                (
+                  currentConversations,
+                ) => {
+                  const withoutCurrent =
+                    currentConversations.filter(
+                      (
+                        current,
+                      ) =>
+                        current.id !==
+                        conversation.id,
+                    );
+
+                  return sortConversations([
+                    conversation,
+                    ...withoutCurrent,
+                  ]);
+                },
               );
-            }
-          },
 
-          onError(
-            message,
-          ) {
-            if (cancelled) {
-              return;
-            }
+              /*
+               * Si tenemos ese chat abierto,
+               * pedimos el detalle completo.
+               */
+              if (
+                activeConversationIdRef
+                  .current ===
+                conversation.id
+              ) {
+                void refreshOpenConversation(
+                  conversation.id,
+                );
+              }
+            },
 
-            setError(
+            onError(
               message,
-            );
+            ) {
+              if (cancelled) {
+                return;
+              }
+
+              setError(
+                message,
+              );
+            },
           },
-        },
-      );
+        );
 
-    return () => {
-      cancelled =
-        true;
+      return () => {
+        cancelled =
+          true;
 
-      socket.disconnect();
-    };
-  },
-  [
-    onLogout,
-    user.role,
-    workspaceId,
-  ],
-);
-
+        socket.disconnect();
+      };
+    },
+    [
+      onLogout,
+      user.role,
+      workspaceId,
+    ],
+  );
 
   async function handleCreateAdmin(
-  event: SyntheticEvent<HTMLFormElement>,
-) {
-  event.preventDefault();
+    event:
+      SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
 
-  const username =
-    newAdminUsername.trim();
+    const username =
+      newAdminUsername.trim();
 
-  if (!username) {
-    setError(
-      'Escribe un nombre de usuario',
-    );
-
-    return;
-  }
-
-  if (!selectedAdminSiteId) {
-    setError(
-      'Selecciona una página para el administrador',
-    );
-
-    return;
-  }
-
-  try {
-    setCreatingAdmin(true);
-    setError(null);
-    setCreatedAdmin(null);
-
-    const accessToken =
-      await getValidAccessToken(
-        getStoredAccessToken() ??
-          undefined,
+    if (!username) {
+      setError(
+        'Escribe un nombre de usuario',
       );
 
-    const created =
-      await createAdmin(
-        accessToken,
-        workspaceId,
-        username,
-        selectedAdminSiteId,
+      return;
+    }
+
+    if (!selectedAdminSiteId) {
+      setError(
+        'Selecciona una página para el administrador',
       );
 
-    setCreatedAdmin({
-      username:
-        created.username,
-      password:
-        created.password,
-    });
+      return;
+    }
 
-    setNewAdminUsername('');
-    setSelectedAdminSiteId('');
+    try {
+      setCreatingAdmin(true);
+      setError(null);
+      setCreatedAdmin(null);
 
-    await loadData();
-  } catch (err) {
-    console.error(err);
+      const accessToken =
+        await getValidAccessToken(
+          getStoredAccessToken() ??
+            undefined,
+        );
 
-    setError(
-      err instanceof Error
-        ? err.message
-        : 'No se pudo crear el administrador',
-    );
-  } finally {
-    setCreatingAdmin(false);
+      const created =
+        await createAdmin(
+          accessToken,
+          workspaceId,
+          username,
+          selectedAdminSiteId,
+        );
+
+      setCreatedAdmin({
+        username:
+          created.username,
+
+        password:
+          created.password,
+      });
+
+      setNewAdminUsername('');
+      setSelectedAdminSiteId('');
+
+      await loadData();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo crear el administrador',
+      );
+    } finally {
+      setCreatingAdmin(false);
+    }
   }
-}
 
   async function handleCreateSite(
-    event: SyntheticEvent<HTMLFormElement>,
+    event:
+      SyntheticEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
@@ -715,9 +772,11 @@ useEffect(
         workspaceId,
         {
           name,
+
           slug:
             newSiteSlug.trim() ||
             undefined,
+
           domain:
             newSiteDomain.trim() ||
             undefined,
@@ -778,7 +837,8 @@ useEffect(
       if (
         selectedAdminSiteId ===
           site.id &&
-        site.status === 'ACTIVE'
+        site.status ===
+          'ACTIVE'
       ) {
         setSelectedAdminSiteId('');
       }
@@ -798,108 +858,111 @@ useEffect(
   }
 
   async function handleCreateAgent(
-  event: SyntheticEvent<HTMLFormElement>,
-) {
-  event.preventDefault();
+    event:
+      SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
 
-  const username =
-    newAgentUsername.trim();
+    const username =
+      newAgentUsername.trim();
 
-  if (!username) {
-    setError(
-      'Escribe un nombre de usuario',
-    );
-
-    return;
-  }
-
-  try {
-    setCreatingAgent(true);
-    setError(null);
-    setCreatedAgent(null);
-
-    const accessToken =
-      await getValidAccessToken(
-        getStoredAccessToken() ??
-          undefined,
+    if (!username) {
+      setError(
+        'Escribe un nombre de usuario',
       );
 
-    const created =
-      await createAgent(
-        accessToken,
-        workspaceId,
-        username,
-      );
-
-    setCreatedAgent({
-      username:
-        created.username,
-      password:
-        created.password,
-    });
-
-    setNewAgentUsername('');
-
-    await loadData();
-  } catch (err) {
-    console.error(err);
-
-    setError(
-      err instanceof Error
-        ? err.message
-        : 'No se pudo crear el agente',
-    );
-  } finally {
-    setCreatingAgent(false);
-  }
-}
-
-async function handleUserStatus(
-  targetUser: WorkspaceUser,
-) {
-  try {
-    setManagingUserId(
-      targetUser.id,
-    );
-
-    setError(null);
-
-    const accessToken =
-      await getValidAccessToken(
-        getStoredAccessToken() ??
-          undefined,
-      );
-
-    if (
-      targetUser.status ===
-      'ACTIVE'
-    ) {
-      await deactivateWorkspaceUser(
-        accessToken,
-        workspaceId,
-        targetUser.id,
-      );
-    } else {
-      await activateWorkspaceUser(
-        accessToken,
-        workspaceId,
-        targetUser.id,
-      );
+      return;
     }
 
-    await loadData();
-  } catch (err) {
-    console.error(err);
+    try {
+      setCreatingAgent(true);
+      setError(null);
+      setCreatedAgent(null);
 
-    setError(
-      err instanceof Error
-        ? err.message
-        : 'No se pudo cambiar el estado del usuario',
-    );
-  } finally {
-    setManagingUserId(null);
+      const accessToken =
+        await getValidAccessToken(
+          getStoredAccessToken() ??
+            undefined,
+        );
+
+      const created =
+        await createAgent(
+          accessToken,
+          workspaceId,
+          username,
+        );
+
+      setCreatedAgent({
+        username:
+          created.username,
+
+        password:
+          created.password,
+      });
+
+      setNewAgentUsername('');
+
+      await loadData();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo crear el agente',
+      );
+    } finally {
+      setCreatingAgent(false);
+    }
   }
-}
+
+  async function handleUserStatus(
+    targetUser:
+      WorkspaceUser,
+  ) {
+    try {
+      setManagingUserId(
+        targetUser.id,
+      );
+
+      setError(null);
+
+      const accessToken =
+        await getValidAccessToken(
+          getStoredAccessToken() ??
+            undefined,
+        );
+
+      if (
+        targetUser.status ===
+        'ACTIVE'
+      ) {
+        await deactivateWorkspaceUser(
+          accessToken,
+          workspaceId,
+          targetUser.id,
+        );
+      } else {
+        await activateWorkspaceUser(
+          accessToken,
+          workspaceId,
+          targetUser.id,
+        );
+      }
+
+      await loadData();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'No se pudo cambiar el estado del usuario',
+      );
+    } finally {
+      setManagingUserId(null);
+    }
+  }
 
   async function handleOpenConversation(
     conversationId: string,
@@ -970,9 +1033,11 @@ async function handleUserStatus(
 
     const conversationSiteId =
       (
-        conversation as ConversationSummary & {
-          siteId?: string | null;
-        }
+        conversation as
+          ConversationSummary & {
+            siteId?:
+              string | null;
+          }
       ).siteId ??
       null;
 
@@ -987,6 +1052,11 @@ async function handleUserStatus(
 
       return;
     }
+
+    const wasAssigned =
+      Boolean(
+        conversation.assignedAgentId,
+      );
 
     try {
       setAssigningConversationId(
@@ -1006,6 +1076,12 @@ async function handleUserStatus(
         workspaceId,
         conversation.id,
         agentId,
+      );
+
+      showNotification(
+        wasAssigned
+          ? 'Conversación reasignada exitosamente.'
+          : 'Conversación asignada exitosamente.',
       );
 
       await loadData();
@@ -1107,16 +1183,22 @@ async function handleUserStatus(
             </p>
           ) : null}
 
-          
-          {user.role === 'OWNER' ? (
+          {user.role ===
+          'OWNER' ? (
             <>
               <div
                 style={{
-                  marginTop: '20px',
-                  padding: '16px',
+                  marginTop:
+                    '20px',
+
+                  padding:
+                    '16px',
+
                   border:
                     '1px solid #e5e7eb',
-                  borderRadius: '12px',
+
+                  borderRadius:
+                    '12px',
                 }}
               >
                 <h2>
@@ -1128,10 +1210,17 @@ async function handleUserStatus(
                     handleCreateSite
                   }
                   style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                    marginBottom: '16px',
+                    display:
+                      'flex',
+
+                    flexWrap:
+                      'wrap',
+
+                    gap:
+                      '8px',
+
+                    marginBottom:
+                      '16px',
                   }}
                 >
                   <input
@@ -1140,7 +1229,9 @@ async function handleUserStatus(
                       newSiteName
                     }
                     placeholder="Nombre de página"
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setNewSiteName(
                         event.target.value,
                       );
@@ -1153,7 +1244,9 @@ async function handleUserStatus(
                       newSiteSlug
                     }
                     placeholder="Slug opcional"
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setNewSiteSlug(
                         event.target.value,
                       );
@@ -1166,7 +1259,9 @@ async function handleUserStatus(
                       newSiteDomain
                     }
                     placeholder="Dominio opcional"
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setNewSiteDomain(
                         event.target.value,
                       );
@@ -1185,38 +1280,53 @@ async function handleUserStatus(
                   </button>
                 </form>
 
-                {sites.length === 0 ? (
+                {sites.length ===
+                0 ? (
                   <p>
                     No hay páginas
                     creadas.
                   </p>
                 ) : (
                   sites.map(
-                    (site) => (
+                    (
+                      site,
+                    ) => (
                       <div
-                        key={site.id}
+                        key={
+                          site.id
+                        }
                         style={{
                           display:
                             'flex',
+
                           justifyContent:
                             'space-between',
+
                           alignItems:
                             'center',
-                          gap: '12px',
+
+                          gap:
+                            '12px',
+
                           padding:
                             '10px 0',
+
                           borderBottom:
                             '1px solid #e5e7eb',
                         }}
                       >
                         <div>
                           <strong>
-                            {site.name}
+                            {
+                              site.name
+                            }
                           </strong>
 
                           <div>
                             Slug:{' '}
-                            {site.slug}
+                            {
+                              site.slug
+                            }
                           </div>
 
                           <div>
@@ -1227,7 +1337,9 @@ async function handleUserStatus(
 
                           <div>
                             Estado:{' '}
-                            {site.status}
+                            {
+                              site.status
+                            }
                           </div>
                         </div>
 
@@ -1259,11 +1371,17 @@ async function handleUserStatus(
 
               <div
                 style={{
-                  marginTop: '20px',
-                  padding: '16px',
+                  marginTop:
+                    '20px',
+
+                  padding:
+                    '16px',
+
                   border:
                     '1px solid #e5e7eb',
-                  borderRadius: '12px',
+
+                  borderRadius:
+                    '12px',
                 }}
               >
                 <h2>
@@ -1275,10 +1393,17 @@ async function handleUserStatus(
                     handleCreateAdmin
                   }
                   style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '8px',
-                    marginBottom: '16px',
+                    display:
+                      'flex',
+
+                    flexWrap:
+                      'wrap',
+
+                    gap:
+                      '8px',
+
+                    marginBottom:
+                      '16px',
                   }}
                 >
                   <input
@@ -1287,7 +1412,9 @@ async function handleUserStatus(
                       newAdminUsername
                     }
                     placeholder="Nombre de usuario"
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setNewAdminUsername(
                         event.target.value,
                       );
@@ -1298,7 +1425,9 @@ async function handleUserStatus(
                     value={
                       selectedAdminSiteId
                     }
-                    onChange={(event) => {
+                    onChange={(
+                      event,
+                    ) => {
                       setSelectedAdminSiteId(
                         event.target.value,
                       );
@@ -1309,12 +1438,20 @@ async function handleUserStatus(
                     </option>
 
                     {activeSites.map(
-                      (site) => (
+                      (
+                        site,
+                      ) => (
                         <option
-                          key={site.id}
-                          value={site.id}
+                          key={
+                            site.id
+                          }
+                          value={
+                            site.id
+                          }
                         >
-                          {site.name}
+                          {
+                            site.name
+                          }
                         </option>
                       ),
                     )}
@@ -1386,26 +1523,37 @@ async function handleUserStatus(
                   </div>
                 ) : null}
 
-                {admins.length === 0 ? (
+                {admins.length ===
+                0 ? (
                   <p>
                     No hay administradores
                     creados.
                   </p>
                 ) : (
                   admins.map(
-                    (admin) => (
+                    (
+                      admin,
+                    ) => (
                       <div
-                        key={admin.id}
+                        key={
+                          admin.id
+                        }
                         style={{
                           display:
                             'flex',
+
                           justifyContent:
                             'space-between',
+
                           alignItems:
                             'center',
-                          gap: '12px',
+
+                          gap:
+                            '12px',
+
                           padding:
                             '10px 0',
+
                           borderBottom:
                             '1px solid #e5e7eb',
                         }}
@@ -1460,181 +1608,203 @@ async function handleUserStatus(
             </>
           ) : null}
 
-          {user.role === 'ADMIN' ? (
-  <div
-    style={{
-      marginTop: '20px',
-      padding: '16px',
-      border:
-        '1px solid #e5e7eb',
-      borderRadius: '12px',
-    }}
-  >
-    <h2>
-      Gestión de agentes
-    </h2>
-
-    <form
-      onSubmit={
-        handleCreateAgent
-      }
-      style={{
-        display: 'flex',
-        gap: '8px',
-        marginBottom: '16px',
-      }}
-    >
-      <input
-        type="text"
-        value={
-          newAgentUsername
-        }
-        placeholder="Nombre de usuario"
-        onChange={(event) => {
-          setNewAgentUsername(
-            event.target.value,
-          );
-        }}
-      />
-
-      <button
-        type="submit"
-        disabled={
-          creatingAgent
-        }
-      >
-        {creatingAgent
-          ? 'Creando...'
-          : 'Crear agente'}
-      </button>
-    </form>
-
-    {createdAgent ? (
-      <div
-        style={{
-          padding: '12px',
-          marginBottom:
-            '16px',
-          border:
-            '1px solid #e5e7eb',
-          borderRadius: '8px',
-        }}
-      >
-        <strong>
-          Agente creado
-        </strong>
-
-        <p>
-          Usuario:{' '}
-          <strong>
-            {
-              createdAgent.username
-            }
-          </strong>
-        </p>
-
-        <p>
-          Contraseña temporal:{' '}
-          <strong>
-            {
-              createdAgent.password
-            }
-          </strong>
-        </p>
-
-        <p>
-          Guarda esta contraseña
-          antes de continuar.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => {
-            setCreatedAgent(
-              null,
-            );
-          }}
-        >
-          Ocultar
-        </button>
-      </div>
-    ) : null}
-
-    {allAgents.length ===
-    0 ? (
-      <p>
-        No hay agentes
-        creados.
-      </p>
-    ) : (
-      <div>
-        {allAgents.map(
-          (agent) => (
+          {user.role ===
+          'ADMIN' ? (
             <div
-              key={
-                agent.id
-              }
               style={{
-                display:
-                  'flex',
-
-                alignItems:
-                  'center',
-
-                justifyContent:
-                  'space-between',
-
-                gap: '12px',
+                marginTop:
+                  '20px',
 
                 padding:
-                  '10px 0',
+                  '16px',
 
-                borderBottom:
+                border:
                   '1px solid #e5e7eb',
+
+                borderRadius:
+                  '12px',
               }}
             >
-              <div>
-                <strong>
-                  {
-                    agent.username
-                  }
-                </strong>
+              <h2>
+                Gestión de agentes
+              </h2>
 
-                <div>
-                  Estado:{' '}
-                  {
-                    agent.status
-                  }
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={
-                  managingUserId ===
-                  agent.id
+              <form
+                onSubmit={
+                  handleCreateAgent
                 }
-                onClick={() => {
-                  void handleUserStatus(
-                    agent,
-                  );
+                style={{
+                  display:
+                    'flex',
+
+                  gap:
+                    '8px',
+
+                  marginBottom:
+                    '16px',
                 }}
               >
-                {managingUserId ===
-                agent.id
-                  ? 'Procesando...'
-                  : agent.status ===
-                      'ACTIVE'
-                    ? 'Desactivar'
-                    : 'Reactivar'}
-              </button>
+                <input
+                  type="text"
+                  value={
+                    newAgentUsername
+                  }
+                  placeholder="Nombre de usuario"
+                  onChange={(
+                    event,
+                  ) => {
+                    setNewAgentUsername(
+                      event.target.value,
+                    );
+                  }}
+                />
+
+                <button
+                  type="submit"
+                  disabled={
+                    creatingAgent
+                  }
+                >
+                  {creatingAgent
+                    ? 'Creando...'
+                    : 'Crear agente'}
+                </button>
+              </form>
+
+              {createdAgent ? (
+                <div
+                  style={{
+                    padding:
+                      '12px',
+
+                    marginBottom:
+                      '16px',
+
+                    border:
+                      '1px solid #e5e7eb',
+
+                    borderRadius:
+                      '8px',
+                  }}
+                >
+                  <strong>
+                    Agente creado
+                  </strong>
+
+                  <p>
+                    Usuario:{' '}
+                    <strong>
+                      {
+                        createdAgent.username
+                      }
+                    </strong>
+                  </p>
+
+                  <p>
+                    Contraseña temporal:{' '}
+                    <strong>
+                      {
+                        createdAgent.password
+                      }
+                    </strong>
+                  </p>
+
+                  <p>
+                    Guarda esta contraseña
+                    antes de continuar.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCreatedAgent(
+                        null,
+                      );
+                    }}
+                  >
+                    Ocultar
+                  </button>
+                </div>
+              ) : null}
+
+              {allAgents.length ===
+              0 ? (
+                <p>
+                  No hay agentes
+                  creados.
+                </p>
+              ) : (
+                <div>
+                  {allAgents.map(
+                    (
+                      agent,
+                    ) => (
+                      <div
+                        key={
+                          agent.id
+                        }
+                        style={{
+                          display:
+                            'flex',
+
+                          alignItems:
+                            'center',
+
+                          justifyContent:
+                            'space-between',
+
+                          gap:
+                            '12px',
+
+                          padding:
+                            '10px 0',
+
+                          borderBottom:
+                            '1px solid #e5e7eb',
+                        }}
+                      >
+                        <div>
+                          <strong>
+                            {
+                              agent.username
+                            }
+                          </strong>
+
+                          <div>
+                            Estado:{' '}
+                            {
+                              agent.status
+                            }
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={
+                            managingUserId ===
+                            agent.id
+                          }
+                          onClick={() => {
+                            void handleUserStatus(
+                              agent,
+                            );
+                          }}
+                        >
+                          {managingUserId ===
+                          agent.id
+                            ? 'Procesando...'
+                            : agent.status ===
+                                'ACTIVE'
+                              ? 'Desactivar'
+                              : 'Reactivar'}
+                        </button>
+                      </div>
+                    ),
+                  )}
+                </div>
+              )}
             </div>
-          ),
-        )}
-      </div>
-    )}
-  </div>
-) : null}
+          ) : null}
 
           <div className="nova-admin-summary">
             <span>
@@ -1679,16 +1849,20 @@ async function handleUserStatus(
 
                     const conversationSiteId =
                       (
-                        conversation as ConversationSummary & {
-                          siteId?: string | null;
-                        }
+                        conversation as
+                          ConversationSummary & {
+                            siteId?:
+                              string | null;
+                          }
                       ).siteId ??
                       null;
 
                     const availableAgents =
                       conversationSiteId
                         ? agents.filter(
-                            (agent) =>
+                            (
+                              agent,
+                            ) =>
                               agent.siteId ===
                               conversationSiteId,
                           )
@@ -1959,6 +2133,36 @@ async function handleUserStatus(
           </div>
         </div>
       </section>
+
+      {notification ? (
+        <div
+          className="nova-admin-notification"
+          role="status"
+          aria-live="polite"
+        >
+          <div>
+            <strong>
+              ✓ Listo
+            </strong>
+
+            <span>
+              {notification}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            aria-label="Cerrar notificación"
+            onClick={() => {
+              setNotification(
+                null,
+              );
+            }}
+          >
+            ×
+          </button>
+        </div>
+      ) : null}
     </main>
   );
 }

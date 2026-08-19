@@ -11,14 +11,18 @@ import type {
   SyntheticEvent,
 } from 'react';
 
-import type { Socket } from 'socket.io-client';
+import type {
+  Socket,
+} from 'socket.io-client';
 
 import {
   getStoredAccessToken,
   NOVA_API_URL,
 } from '../auth/auth';
 
-import type { AuthUser } from '../auth/auth';
+import type {
+  AuthUser,
+} from '../auth/auth';
 
 import {
   claimConversation,
@@ -72,7 +76,9 @@ function sortMessages(
   );
 }
 
-function formatTime(value: string) {
+function formatTime(
+  value: string,
+) {
   return new Intl.DateTimeFormat(
     'es-CL',
     {
@@ -103,7 +109,8 @@ function formatDateTime(
 }
 
 function getLastMessage(
-  conversation: ConversationSummary,
+  conversation:
+    ConversationSummary,
 ) {
   const message =
     conversation.messages[0];
@@ -240,7 +247,8 @@ export function InboxPage({
   const [
     composerText,
     setComposerText,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     selectedImage,
@@ -261,17 +269,18 @@ export function InboxPage({
   const [
     sendingMessage,
     setSendingMessage,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     conversationAction,
     setConversationAction,
   ] =
     useState<
-      'OPEN' |
-      'PENDING' |
-      'CLOSED' |
-      null
+      | 'OPEN'
+      | 'PENDING'
+      | 'CLOSED'
+      | null
     >(null);
 
   const socketRef =
@@ -290,27 +299,46 @@ export function InboxPage({
     >([]);
 
   /*
-   * Mientras estamos tomando una
-   * conversación, el backend enviará
-   * conversation:removed al room
-   * "unassigned".
+   * Cuando el propio AGENT pulsa
+   * "Tomar", recibirá también el
+   * conversation:removed de la room
+   * de conversaciones sin asignar.
    *
-   * Debemos ignorar exactamente ese
-   * remove en el agente que la tomó.
+   * Debemos ignorar ese remove.
    */
   const claimingConversationIdRef =
     useRef<
       string | null
     >(null);
 
-  /*
-   * Protección de respaldo:
-   * si por alguna razón el evento
-   * conversation:removed no llega,
-   * no dejamos la protección activa
-   * indefinidamente.
-   */
   const claimProtectionTimeoutRef =
+    useRef<
+      number | null
+    >(null);
+
+  /*
+   * Cuando OWNER / ADMIN asigna una
+   * conversación a este AGENT:
+   *
+   * 1. llega conversation:updated
+   *    por user:{agentId};
+   *
+   * 2. llega conversation:removed
+   *    por site:{siteId}:unassigned.
+   *
+   * Ese segundo evento NO significa
+   * que debamos quitar la conversación
+   * de "Mis conversaciones".
+   *
+   * Esta protección identifica
+   * exactamente ese caso.
+   */
+  const assignedConversationProtectionRef =
+    useRef<
+      string | null
+    >(null);
+
+  const assignedConversationProtectionTimeoutRef =
     useRef<
       number | null
     >(null);
@@ -349,11 +377,14 @@ export function InboxPage({
     useCallback(
       () => {
         setComposerText('');
+
         setSelectedImage(
           null,
         );
 
-        if (imagePreviewUrlRef.current) {
+        if (
+          imagePreviewUrlRef.current
+        ) {
           URL.revokeObjectURL(
             imagePreviewUrlRef.current,
           );
@@ -366,7 +397,9 @@ export function InboxPage({
           null,
         );
 
-        if (fileInputRef.current) {
+        if (
+          fileInputRef.current
+        ) {
           fileInputRef.current.value =
             '';
         }
@@ -450,30 +483,110 @@ export function InboxPage({
       [],
     );
 
+  const clearAssignedConversationProtection =
+    useCallback(
+      (
+        conversationId?:
+          string,
+      ) => {
+        if (
+          conversationId &&
+          assignedConversationProtectionRef
+            .current !==
+            conversationId
+        ) {
+          return;
+        }
+
+        assignedConversationProtectionRef.current =
+          null;
+
+        if (
+          assignedConversationProtectionTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            assignedConversationProtectionTimeoutRef
+              .current,
+          );
+
+          assignedConversationProtectionTimeoutRef.current =
+            null;
+        }
+      },
+      [],
+    );
+
+  const protectAssignedConversation =
+    useCallback(
+      (
+        conversationId:
+          string,
+      ) => {
+        if (
+          assignedConversationProtectionTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            assignedConversationProtectionTimeoutRef
+              .current,
+          );
+        }
+
+        assignedConversationProtectionRef.current =
+          conversationId;
+
+        assignedConversationProtectionTimeoutRef.current =
+          window.setTimeout(
+            () => {
+              clearAssignedConversationProtection(
+                conversationId,
+              );
+            },
+            5000,
+          );
+      },
+      [
+        clearAssignedConversationProtection,
+      ],
+    );
+
   const upsertConversation =
     useCallback(
       (
         conversation:
           ConversationSummary,
       ) => {
-        setConversations(
-          (
-            currentConversations,
-          ) => {
-            const withoutCurrent =
-              currentConversations.filter(
-                (
-                  current,
-                ) =>
-                  current.id !==
-                  conversation.id,
-              );
+        /*
+         * Actualizamos el ref de inmediato.
+         *
+         * Así cualquier evento Socket que
+         * llegue justo después encuentra
+         * la versión nueva sin esperar al
+         * siguiente render de React.
+         */
+        const withoutCurrent =
+          conversationsRef.current.filter(
+            (
+              current,
+            ) =>
+              current.id !==
+              conversation.id,
+          );
 
-            return sortConversations([
-              conversation,
-              ...withoutCurrent,
-            ]);
-          },
+        const nextConversations =
+          sortConversations([
+            conversation,
+            ...withoutCurrent,
+          ]);
+
+        conversationsRef.current =
+          nextConversations;
+
+        setConversations(
+          nextConversations,
         );
 
         setActiveConversation(
@@ -511,19 +624,16 @@ export function InboxPage({
       },
       [],
     );
-  
+
   const applyConversationStateUpdate =
-  useCallback(
-    (
-      conversation:
-        ConversationSummary,
-    ) => {
-      setConversations(
-        (
-          currentConversations,
-        ) =>
+    useCallback(
+      (
+        conversation:
+          ConversationSummary,
+      ) => {
+        const nextConversations =
           sortConversations(
-            currentConversations.map(
+            conversationsRef.current.map(
               (
                 current,
               ) => {
@@ -548,38 +658,44 @@ export function InboxPage({
                 };
               },
             ),
-          ),
-      );
+          );
 
-      setActiveConversation(
-        (
-          current,
-        ) => {
-          if (
-            !current ||
-            current.id !==
-              conversation.id
-          ) {
-            return current;
-          }
+        conversationsRef.current =
+          nextConversations;
 
-          return {
-            ...current,
+        setConversations(
+          nextConversations,
+        );
 
-            status:
-              conversation.status,
+        setActiveConversation(
+          (
+            current,
+          ) => {
+            if (
+              !current ||
+              current.id !==
+                conversation.id
+            ) {
+              return current;
+            }
 
-            updatedAt:
-              conversation.updatedAt,
+            return {
+              ...current,
 
-            closedAt:
-              conversation.closedAt,
-          };
-        },
-      );
-    },
-    [],
-  );
+              status:
+                conversation.status,
+
+              updatedAt:
+                conversation.updatedAt,
+
+              closedAt:
+                conversation.closedAt,
+            };
+          },
+        );
+      },
+      [],
+    );
 
   const removeConversation =
     useCallback(
@@ -587,17 +703,20 @@ export function InboxPage({
         conversationId:
           string,
       ) => {
+        const nextConversations =
+          conversationsRef.current.filter(
+            (
+              conversation,
+            ) =>
+              conversation.id !==
+              conversationId,
+          );
+
+        conversationsRef.current =
+          nextConversations;
+
         setConversations(
-          (
-            currentConversations,
-          ) =>
-            currentConversations.filter(
-              (
-                conversation,
-              ) =>
-                conversation.id !==
-                conversationId,
-            ),
+          nextConversations,
         );
 
         if (
@@ -674,7 +793,9 @@ export function InboxPage({
         conversationId:
           string,
       ) => {
-        if (!workspaceId) {
+        if (
+          !workspaceId
+        ) {
           return;
         }
 
@@ -713,14 +834,6 @@ export function InboxPage({
               conversationId,
             );
 
-          /*
-           * Podría ocurrir que mientras
-           * cargábamos el detalle otro
-           * agente tomara el chat.
-           *
-           * El backend es la autoridad y
-           * rechazará el acceso en ese caso.
-           */
           setActiveConversation(
             conversation,
           );
@@ -728,7 +841,9 @@ export function InboxPage({
           const socket =
             socketRef.current;
 
-          if (socket) {
+          if (
+            socket
+          ) {
             joinAgentConversation(
               socket,
               workspaceId,
@@ -774,7 +889,9 @@ export function InboxPage({
       getStoredAccessToken() ??
       '';
 
-    if (!accessToken) {
+    if (
+      !accessToken
+    ) {
       onLogout();
 
       return;
@@ -784,10 +901,8 @@ export function InboxPage({
       activeConversation.id;
 
     /*
-     * Activamos la protección ANTES
-     * del PATCH porque el evento socket
-     * puede llegar antes de que termine
-     * la respuesta HTTP.
+     * Activamos protección ANTES
+     * del PATCH.
      */
     claimingConversationIdRef.current =
       conversationId;
@@ -829,13 +944,6 @@ export function InboxPage({
           conversationId,
         );
 
-      /*
-       * Aplicamos inmediatamente la
-       * respuesta REST.
-       *
-       * No esperamos al Socket para que
-       * la interfaz responda al instante.
-       */
       upsertConversation(
         claimedConversation,
       );
@@ -879,23 +987,20 @@ export function InboxPage({
 
       showNotification({
         type: 'success',
+
         title:
           'Conversación tomada',
+
         message:
           'La conversación ahora está asignada a ti.',
       });
 
       /*
-       * NO limpiamos todavía
+       * No limpiamos inmediatamente
        * claimingConversationIdRef.
        *
-       * conversation:removed puede
-       * llegar justo después de la
-       * respuesta HTTP.
-       *
-       * El handler del Socket consumirá
-       * ese evento y limpiará la
-       * protección.
+       * El remove del room "unassigned"
+       * puede llegar justo después.
        */
     } catch (
       err
@@ -925,9 +1030,12 @@ export function InboxPage({
         takenByAnotherAgent
       ) {
         showNotification({
-          type: 'warning',
+          type:
+            'warning',
+
           title:
             'No se pudo tomar la conversación',
+
           message:
             'Otro agente la tomó antes que tú.',
         });
@@ -937,11 +1045,6 @@ export function InboxPage({
         );
       }
 
-      /*
-       * Si otro agente ganó la carrera,
-       * sincronizamos nuevamente la
-       * bandeja para retirar el chat.
-       */
       try {
         const latestConversations =
           await getConversations(
@@ -949,8 +1052,13 @@ export function InboxPage({
             workspaceId,
           );
 
+        const sortedConversations =
+          sortConversations(
+            latestConversations,
+          );
+
         const conversationStillVisible =
-          latestConversations.some(
+          sortedConversations.some(
             (
               conversation,
             ) =>
@@ -958,10 +1066,11 @@ export function InboxPage({
               conversationId,
           );
 
+        conversationsRef.current =
+          sortedConversations;
+
         setConversations(
-          sortConversations(
-            latestConversations,
-          ),
+          sortedConversations,
         );
 
         if (
@@ -983,7 +1092,8 @@ export function InboxPage({
   }
 
   async function handleConversationStatus(
-    status: 'OPEN' | 'PENDING',
+    status:
+      'OPEN' | 'PENDING',
   ) {
     if (
       !activeConversation ||
@@ -1000,7 +1110,9 @@ export function InboxPage({
       getStoredAccessToken() ??
       '';
 
-    if (!accessToken) {
+    if (
+      !accessToken
+    ) {
       onLogout();
 
       return;
@@ -1031,23 +1143,31 @@ export function InboxPage({
       );
 
       showNotification({
-        type: 'success',
+        type:
+          'success',
+
         title:
-          status === 'OPEN'
+          status ===
+          'OPEN'
             ? 'Conversación abierta'
             : 'Conversación pendiente',
+
         message:
-          status === 'OPEN'
+          status ===
+          'OPEN'
             ? 'La conversación volvió a estado abierta.'
             : 'La conversación quedó en estado pendiente.',
       });
-    } catch (err) {
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cambiar el estado de la conversación',
       );
@@ -1074,7 +1194,9 @@ export function InboxPage({
       getStoredAccessToken() ??
       '';
 
-    if (!accessToken) {
+    if (
+      !accessToken
+    ) {
       onLogout();
 
       return;
@@ -1106,19 +1228,25 @@ export function InboxPage({
       resetComposer();
 
       showNotification({
-        type: 'success',
+        type:
+          'success',
+
         title:
           'Conversación cerrada',
+
         message:
           'La conversación fue cerrada correctamente.',
       });
-    } catch (err) {
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cerrar la conversación',
       );
@@ -1137,7 +1265,9 @@ export function InboxPage({
       event.target.files?.[0] ??
       null;
 
-    if (!file) {
+    if (
+      !file
+    ) {
       return;
     }
 
@@ -1153,11 +1283,16 @@ export function InboxPage({
         file.type,
       )
     ) {
-      event.target.value = '';
+      event.target.value =
+        '';
 
       showNotification({
-        type: 'warning',
-        title: 'Imagen no válida',
+        type:
+          'warning',
+
+        title:
+          'Imagen no válida',
+
         message:
           'Solo se permiten imágenes JPEG, PNG, WEBP o GIF.',
       });
@@ -1172,11 +1307,16 @@ export function InboxPage({
       file.size >
       maxSizeBytes
     ) {
-      event.target.value = '';
+      event.target.value =
+        '';
 
       showNotification({
-        type: 'warning',
-        title: 'Imagen demasiado grande',
+        type:
+          'warning',
+
+        title:
+          'Imagen demasiado grande',
+
         message:
           'La imagen no puede superar los 5 MB.',
       });
@@ -1189,7 +1329,9 @@ export function InboxPage({
         file,
       );
 
-    if (imagePreviewUrlRef.current) {
+    if (
+      imagePreviewUrlRef.current
+    ) {
       URL.revokeObjectURL(
         imagePreviewUrlRef.current,
       );
@@ -1208,7 +1350,9 @@ export function InboxPage({
   }
 
   function clearSelectedImage() {
-    if (imagePreviewUrlRef.current) {
+    if (
+      imagePreviewUrlRef.current
+    ) {
       URL.revokeObjectURL(
         imagePreviewUrlRef.current,
       );
@@ -1225,7 +1369,9 @@ export function InboxPage({
       null,
     );
 
-    if (fileInputRef.current) {
+    if (
+      fileInputRef.current
+    ) {
       fileInputRef.current.value =
         '';
     }
@@ -1257,7 +1403,9 @@ export function InboxPage({
       getStoredAccessToken() ??
       '';
 
-    if (!accessToken) {
+    if (
+      !accessToken
+    ) {
       onLogout();
 
       return;
@@ -1297,13 +1445,16 @@ export function InboxPage({
       );
 
       resetComposer();
-    } catch (err) {
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo enviar el mensaje',
       );
@@ -1328,7 +1479,8 @@ export function InboxPage({
       KeyboardEvent<HTMLTextAreaElement>,
   ) {
     if (
-      event.key !== 'Enter' ||
+      event.key !==
+        'Enter' ||
       event.shiftKey
     ) {
       return;
@@ -1370,6 +1522,12 @@ export function InboxPage({
           workspaceId,
           {
             onWorkspaceJoined() {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               setSocketStatus(
                 'En línea',
               );
@@ -1394,6 +1552,12 @@ export function InboxPage({
             },
 
             onConversationJoined() {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               setSocketStatus(
                 'En línea',
               );
@@ -1402,81 +1566,103 @@ export function InboxPage({
             onMessage(
               message,
             ) {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               addMessage(
                 message,
               );
             },
 
-onConversationUpdated(
-  conversation,
-) {
-  const previousConversation =
-    conversationsRef.current.find(
-      (
-        currentConversation,
-      ) =>
-        currentConversation.id ===
-        conversation.id,
-    );
+            onConversationUpdated(
+              conversation,
+            ) {
+              if (
+                cancelled
+              ) {
+                return;
+              }
 
-  const wasAlreadyAssignedToMe =
-    previousConversation
-      ?.assignedAgentId ===
-    user.userId;
+              const previousConversation =
+                conversationsRef.current.find(
+                  (
+                    currentConversation,
+                  ) =>
+                    currentConversation.id ===
+                    conversation.id,
+                );
 
-  const isNowAssignedToMe =
-    conversation.assignedAgentId ===
-    user.userId;
+              const wasAlreadyAssignedToMe =
+                previousConversation
+                  ?.assignedAgentId ===
+                user.userId;
 
-  const isMyOwnClaim =
-    claimingConversationIdRef
-      .current ===
-    conversation.id;
+              const isNowAssignedToMe =
+                conversation.assignedAgentId ===
+                user.userId;
 
-  /*
-   * Si la conversación acaba de
-   * ser asignada a este agente
-   * desde OWNER / ADMIN,
-   * mostramos una notificación.
-   *
-   * No notificamos:
-   * - si ya estaba asignada;
-   * - si el propio agente la tomó.
-   */
-  if (
-    isNowAssignedToMe &&
-    !wasAlreadyAssignedToMe &&
-    !isMyOwnClaim
-  ) {
-    showNotification({
-      type: 'success',
-      title:
-        'Nueva conversación asignada',
-      message:
-        `Te asignaron la conversación del visitante ${conversation.visitor.id.slice(
-          0,
-          8,
-        )}.`,
-    });
-  }
+              const isMyOwnClaim =
+                claimingConversationIdRef
+                  .current ===
+                conversation.id;
 
-  upsertConversation(
-    conversation,
-  );
-},
+              /*
+               * OWNER / ADMIN acaba de
+               * asignar esta conversación
+               * a este AGENT.
+               *
+               * Protegemos el remove que
+               * llegará desde la room
+               * "unassigned".
+               */
+              if (
+                isNowAssignedToMe &&
+                !wasAlreadyAssignedToMe &&
+                !isMyOwnClaim
+              ) {
+                protectAssignedConversation(
+                  conversation.id,
+                );
+
+                showNotification({
+                  type:
+                    'success',
+
+                  title:
+                    'Nueva conversación asignada',
+
+                  message:
+                    `Te asignaron la conversación del visitante ${conversation.visitor.id.slice(
+                      0,
+                      8,
+                    )}.`,
+                });
+              }
+
+              upsertConversation(
+                conversation,
+              );
+            },
 
             onConversationRemoved(
               conversationId,
             ) {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               /*
-               * Si este remove pertenece
-               * exactamente al claim que
-               * nosotros estamos haciendo,
-               * NO quitamos el chat.
+               * CASO 1:
+               * este AGENT pulsó "Tomar".
                *
-               * El backend también nos
-               * envía conversation:updated
-               * por user:{agentId}.
+               * El remove solamente
+               * significa que desaparece
+               * de "Sin asignar".
                */
               if (
                 claimingConversationIdRef
@@ -1484,6 +1670,30 @@ onConversationUpdated(
                 conversationId
               ) {
                 clearClaimProtection(
+                  conversationId,
+                );
+
+                return;
+              }
+
+              /*
+               * CASO 2:
+               * OWNER / ADMIN acaba de
+               * asignar esta conversación
+               * a este AGENT.
+               *
+               * El remove viene de
+               * site:{siteId}:unassigned.
+               *
+               * No debemos eliminarla de
+               * "Mis conversaciones".
+               */
+              if (
+                assignedConversationProtectionRef
+                  .current ===
+                conversationId
+              ) {
+                clearAssignedConversationProtection(
                   conversationId,
                 );
 
@@ -1499,28 +1709,36 @@ onConversationUpdated(
                     conversationId,
                 );
 
+              /*
+               * Si seguía sin asignar,
+               * significa normalmente que
+               * otro agente la tomó.
+               */
               if (
                 removedConversation
                   ?.assignedAgentId ===
                 null
               ) {
                 showNotification({
-                  type: 'warning',
+                  type:
+                    'warning',
+
                   title:
                     'Conversación tomada',
+
                   message:
                     'Otro agente tomó esta conversación.',
                 });
               }
 
               /*
-               * Cualquier otro remove sí
-               * es legítimo.
+               * Cualquier otro remove
+               * sí debe eliminarla.
                *
                * Ejemplo:
-               * un ADMIN reasignó una
-               * conversación nuestra a
-               * otro agente.
+               * ADMIN reasignó una
+               * conversación nuestra
+               * a otro AGENT.
                */
               removeConversation(
                 conversationId,
@@ -1528,6 +1746,12 @@ onConversationUpdated(
             },
 
             onDisconnect() {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               setSocketStatus(
                 'Desconectado',
               );
@@ -1536,6 +1760,12 @@ onConversationUpdated(
             onError(
               message,
             ) {
+              if (
+                cancelled
+              ) {
+                return;
+              }
+
               setError(
                 message,
               );
@@ -1568,10 +1798,16 @@ onConversationUpdated(
             return;
           }
 
-          setConversations(
+          const sortedConversations =
             sortConversations(
               result,
-            ),
+            );
+
+          conversationsRef.current =
+            sortedConversations;
+
+          setConversations(
+            sortedConversations,
           );
         } catch (
           err
@@ -1614,16 +1850,18 @@ onConversationUpdated(
       };
     },
     [
-  addMessage,
-  clearClaimProtection,
-  onLogout,
-  removeConversation,
-  showNotification,
-  upsertConversation,
-  user.role,
-  user.userId,
-  workspaceId,
-],
+      addMessage,
+      clearAssignedConversationProtection,
+      clearClaimProtection,
+      onLogout,
+      protectAssignedConversation,
+      removeConversation,
+      showNotification,
+      upsertConversation,
+      user.role,
+      user.userId,
+      workspaceId,
+    ],
   );
 
   useEffect(
@@ -1641,6 +1879,17 @@ onConversationUpdated(
         }
 
         if (
+          assignedConversationProtectionTimeoutRef
+            .current !==
+          null
+        ) {
+          window.clearTimeout(
+            assignedConversationProtectionTimeoutRef
+              .current,
+          );
+        }
+
+        if (
           notificationTimeoutRef
             .current !==
           null
@@ -1651,7 +1900,9 @@ onConversationUpdated(
           );
         }
 
-        if (imagePreviewUrlRef.current) {
+        if (
+          imagePreviewUrlRef.current
+        ) {
           URL.revokeObjectURL(
             imagePreviewUrlRef.current,
           );
@@ -1669,7 +1920,9 @@ onConversationUpdated(
       const container =
         messagesContainerRef.current;
 
-      if (!container) {
+      if (
+        !container
+      ) {
         return;
       }
 
@@ -1705,17 +1958,6 @@ onConversationUpdated(
     );
   }
 
-  /*
-   * El backend de AGENT solamente
-   * entrega:
-   *
-   * - assignedAgentId = null;
-   * - conversaciones asignadas
-   *   al propio agente.
-   *
-   * Por eso podemos separar la
-   * bandeja con este criterio.
-   */
   const unassignedConversations =
     conversations.filter(
       (
@@ -2077,7 +2319,9 @@ onConversationUpdated(
 
               <div
                 className="nova-inbox__messages"
-                ref={messagesContainerRef}
+                ref={
+                  messagesContainerRef
+                }
               >
                 {activeConversation
                   .messages.length ===
@@ -2106,20 +2350,20 @@ onConversationUpdated(
                         {message.type ===
                         'IMAGE' ? (
                           <>
-                            {message.mediaUrl && (
+                            {message.mediaUrl ? (
                               <img
                                 src={`${NOVA_API_URL}${message.mediaUrl}`}
                                 alt="Imagen del chat"
                               />
-                            )}
+                            ) : null}
 
-                            {message.content && (
+                            {message.content ? (
                               <div>
                                 {
                                   message.content
                                 }
                               </div>
-                            )}
+                            ) : null}
                           </>
                         ) : (
                           <div>
@@ -2138,7 +2382,6 @@ onConversationUpdated(
                     ),
                   )
                 )}
-
               </div>
 
               {activeConversation
@@ -2158,67 +2401,111 @@ onConversationUpdated(
                 <footer
                   className="nova-inbox__composer-placeholder"
                   style={{
-                    display: 'block',
-                    padding: '12px',
+                    display:
+                      'block',
+
+                    padding:
+                      '12px',
                   }}
                 >
-                  {selectedImage && (
+                  {selectedImage ? (
                     <div
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        marginBottom: '10px',
-                        padding: '8px',
-                        borderRadius: '10px',
+                        display:
+                          'flex',
+
+                        alignItems:
+                          'center',
+
+                        gap:
+                          '10px',
+
+                        marginBottom:
+                          '10px',
+
+                        padding:
+                          '8px',
+
+                        borderRadius:
+                          '10px',
+
                         background:
                           'rgba(255, 255, 255, 0.06)',
                       }}
                     >
-                      {imagePreviewUrl && (
+                      {imagePreviewUrl ? (
                         <img
-                          src={imagePreviewUrl}
+                          src={
+                            imagePreviewUrl
+                          }
                           alt="Vista previa de la imagen"
                           style={{
-                            width: '56px',
-                            height: '56px',
-                            borderRadius: '8px',
-                            objectFit: 'cover',
-                            flexShrink: 0,
+                            width:
+                              '56px',
+
+                            height:
+                              '56px',
+
+                            borderRadius:
+                              '8px',
+
+                            objectFit:
+                              'cover',
+
+                            flexShrink:
+                              0,
                           }}
                         />
-                      )}
+                      ) : null}
 
                       <div
                         style={{
-                          minWidth: 0,
-                          flex: 1,
-                          textAlign: 'left',
+                          minWidth:
+                            0,
+
+                          flex:
+                            1,
+
+                          textAlign:
+                            'left',
                         }}
                       >
                         <strong
                           style={{
-                            display: 'block',
-                            overflow: 'hidden',
+                            display:
+                              'block',
+
+                            overflow:
+                              'hidden',
+
                             textOverflow:
                               'ellipsis',
-                            whiteSpace: 'nowrap',
+
+                            whiteSpace:
+                              'nowrap',
                           }}
                         >
-                          {selectedImage.name}
+                          {
+                            selectedImage.name
+                          }
                         </strong>
 
                         <span
                           style={{
-                            opacity: 0.7,
-                            fontSize: '12px',
+                            opacity:
+                              0.7,
+
+                            fontSize:
+                              '12px',
                           }}
                         >
                           {(
                             selectedImage.size /
                             1024 /
                             1024
-                          ).toFixed(2)}{' '}
+                          ).toFixed(
+                            2,
+                          )}{' '}
                           MB
                         </span>
                       </div>
@@ -2226,35 +2513,50 @@ onConversationUpdated(
                       <button
                         type="button"
                         aria-label="Quitar imagen"
-                        disabled={sendingMessage}
+                        disabled={
+                          sendingMessage
+                        }
                         onClick={
                           clearSelectedImage
                         }
                         style={{
-                          border: 0,
+                          border:
+                            0,
+
                           background:
                             'transparent',
-                          fontSize: '20px',
-                          cursor: 'pointer',
+
+                          fontSize:
+                            '20px',
+
+                          cursor:
+                            'pointer',
                         }}
                       >
                         ×
                       </button>
                     </div>
-                  )}
+                  ) : null}
 
                   <form
                     onSubmit={
                       handleComposerSubmit
                     }
                     style={{
-                      display: 'flex',
-                      alignItems: 'flex-end',
-                      gap: '8px',
+                      display:
+                        'flex',
+
+                      alignItems:
+                        'flex-end',
+
+                      gap:
+                        '8px',
                     }}
                   >
                     <input
-                      ref={fileInputRef}
+                      ref={
+                        fileInputRef
+                      }
                       type="file"
                       accept="image/jpeg,image/png,image/webp,image/gif"
                       hidden
@@ -2267,28 +2569,43 @@ onConversationUpdated(
                       type="button"
                       aria-label="Adjuntar imagen"
                       title="Adjuntar imagen"
-                      disabled={sendingMessage}
+                      disabled={
+                        sendingMessage
+                      }
                       onClick={() => {
                         fileInputRef.current
                           ?.click();
                       }}
                       style={{
-                        minWidth: '44px',
-                        minHeight: '44px',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
+                        minWidth:
+                          '44px',
+
+                        minHeight:
+                          '44px',
+
+                        borderRadius:
+                          '10px',
+
+                        cursor:
+                          'pointer',
                       }}
                     >
                       📎
                     </button>
 
                     <textarea
-                      value={composerText}
+                      value={
+                        composerText
+                      }
                       placeholder="Escribe un mensaje..."
                       aria-label="Mensaje"
                       rows={1}
-                      disabled={sendingMessage}
-                      onChange={(event) => {
+                      disabled={
+                        sendingMessage
+                      }
+                      onChange={(
+                        event,
+                      ) => {
                         setComposerText(
                           event.target.value,
                         );
@@ -2297,13 +2614,26 @@ onConversationUpdated(
                         handleComposerKeyDown
                       }
                       style={{
-                        flex: 1,
-                        minHeight: '44px',
-                        maxHeight: '120px',
-                        resize: 'vertical',
-                        padding: '10px 12px',
-                        borderRadius: '10px',
-                        font: 'inherit',
+                        flex:
+                          1,
+
+                        minHeight:
+                          '44px',
+
+                        maxHeight:
+                          '120px',
+
+                        resize:
+                          'vertical',
+
+                        padding:
+                          '10px 12px',
+
+                        borderRadius:
+                          '10px',
+
+                        font:
+                          'inherit',
                       }}
                     />
 
@@ -2311,16 +2641,25 @@ onConversationUpdated(
                       type="submit"
                       disabled={
                         sendingMessage ||
-                        (!composerText.trim() &&
-                          !selectedImage)
+                        (
+                          !composerText.trim() &&
+                          !selectedImage
+                        )
                       }
                       style={{
-                        minHeight: '44px',
-                        padding: '0 16px',
-                        borderRadius: '10px',
-                        cursor: sendingMessage
-                          ? 'wait'
-                          : 'pointer',
+                        minHeight:
+                          '44px',
+
+                        padding:
+                          '0 16px',
+
+                        borderRadius:
+                          '10px',
+
+                        cursor:
+                          sendingMessage
+                            ? 'wait'
+                            : 'pointer',
                       }}
                     >
                       {sendingMessage
@@ -2331,10 +2670,17 @@ onConversationUpdated(
 
                   <div
                     style={{
-                      marginTop: '6px',
-                      textAlign: 'left',
-                      fontSize: '12px',
-                      opacity: 0.65,
+                      marginTop:
+                        '6px',
+
+                      textAlign:
+                        'left',
+
+                      fontSize:
+                        '12px',
+
+                      opacity:
+                        0.65,
                     }}
                   >
                     Enter para enviar · Shift +
@@ -2347,7 +2693,7 @@ onConversationUpdated(
         </section>
       </div>
 
-      {notification && (
+      {notification ? (
         <div
           role={
             notification.type ===
@@ -2357,54 +2703,87 @@ onConversationUpdated(
           }
           aria-live="polite"
           style={{
-            position: 'fixed',
-            right: '24px',
-            bottom: error
-              ? '88px'
-              : '24px',
-            zIndex: 1000,
-            width: 'min(360px, calc(100vw - 48px))',
-            padding: '14px 16px',
-            borderRadius: '12px',
+            position:
+              'fixed',
+
+            right:
+              '24px',
+
+            bottom:
+              error
+                ? '88px'
+                : '24px',
+
+            zIndex:
+              1000,
+
+            width:
+              'min(360px, calc(100vw - 48px))',
+
+            padding:
+              '14px 16px',
+
+            borderRadius:
+              '12px',
+
             background:
               notification.type ===
               'success'
                 ? '#163d2c'
                 : '#3d2f16',
-            color: '#ffffff',
+
+            color:
+              '#ffffff',
+
             boxShadow:
               '0 14px 36px rgba(0, 0, 0, 0.28)',
+
             border:
               '1px solid rgba(255, 255, 255, 0.12)',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '12px',
+
+            display:
+              'flex',
+
+            alignItems:
+              'flex-start',
+
+            gap:
+              '12px',
           }}
         >
           <div
             style={{
-              flex: 1,
+              flex:
+                1,
             }}
           >
             <strong
               style={{
-                display: 'block',
-                marginBottom: '4px',
+                display:
+                  'block',
+
+                marginBottom:
+                  '4px',
               }}
             >
               {notification.type ===
               'success'
                 ? '✓ '
                 : '⚠ '}
-              {notification.title}
+              {
+                notification.title
+              }
             </strong>
 
             <span
               style={{
-                opacity: 0.9,
+                opacity:
+                  0.9,
               }}
             >
-              {notification.message}
+              {
+                notification.message
+              }
             </span>
           </div>
 
@@ -2415,37 +2794,36 @@ onConversationUpdated(
               setNotification(
                 null,
               );
-
-              if (
-                notificationTimeoutRef
-                  .current !==
-                null
-              ) {
-                window.clearTimeout(
-                  notificationTimeoutRef
-                    .current,
-                );
-
-                notificationTimeoutRef.current =
-                  null;
-              }
             }}
             style={{
-              border: 0,
-              padding: 0,
-              background: 'transparent',
-              color: 'inherit',
-              fontSize: '20px',
-              lineHeight: 1,
-              cursor: 'pointer',
+              border:
+                0,
+
+              padding:
+                0,
+
+              background:
+                'transparent',
+
+              color:
+                'inherit',
+
+              fontSize:
+                '20px',
+
+              lineHeight:
+                1,
+
+              cursor:
+                'pointer',
             }}
           >
             ×
           </button>
         </div>
-      )}
+      ) : null}
 
-      {error && (
+      {error ? (
         <div
           className="nova-inbox__error"
           role="alert"
@@ -2463,7 +2841,7 @@ onConversationUpdated(
             ×
           </button>
         </div>
-      )}
+      ) : null}
     </main>
   );
 }

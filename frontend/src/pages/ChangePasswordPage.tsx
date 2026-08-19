@@ -19,10 +19,13 @@ import type {
 
 type ChangePasswordPageProps = {
   user: AuthUser;
+
   onPasswordChanged: (
     user: AuthUser,
   ) => void;
-  onLogout: () => void;
+
+  onLogout:
+    () => void;
 };
 
 export function ChangePasswordPage({
@@ -31,31 +34,30 @@ export function ChangePasswordPage({
   onLogout,
 }: ChangePasswordPageProps) {
   const [
-    currentPassword,
-    setCurrentPassword,
-  ] = useState('');
-
-  const [
     newPassword,
     setNewPassword,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     confirmPassword,
     setConfirmPassword,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     submitting,
     setSubmitting,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     error,
     setError,
-  ] = useState<string | null>(
-    null,
-  );
+  ] =
+    useState<
+      string | null
+    >(null);
 
   async function handleSubmit(
     event:
@@ -64,7 +66,6 @@ export function ChangePasswordPage({
     event.preventDefault();
 
     if (
-      !currentPassword ||
       !newPassword ||
       !confirmPassword
     ) {
@@ -76,7 +77,8 @@ export function ChangePasswordPage({
     }
 
     if (
-      newPassword.length < 8
+      newPassword.length <
+      8
     ) {
       setError(
         'La nueva contraseña debe tener al menos 8 caracteres.',
@@ -90,18 +92,7 @@ export function ChangePasswordPage({
       confirmPassword
     ) {
       setError(
-        'Las nuevas contraseñas no coinciden.',
-      );
-
-      return;
-    }
-
-    if (
-      currentPassword ===
-      newPassword
-    ) {
-      setError(
-        'La nueva contraseña debe ser diferente a la contraseña temporal.',
+        'Las contraseñas no coinciden.',
       );
 
       return;
@@ -122,16 +113,26 @@ export function ChangePasswordPage({
             undefined,
         );
 
+      /*
+       * La contraseña temporal ya fue
+       * validada durante el login.
+       *
+       * Aquí solamente enviamos
+       * la nueva contraseña.
+       */
       await changePassword(
         accessToken,
-        currentPassword,
         newPassword,
       );
 
       /*
-       * Volvemos a consultar /auth/me
-       * para obtener mustChangePassword
-       * actualizado desde el backend.
+       * /auth/me vuelve a consultar
+       * los datos reales del usuario
+       * mediante JwtStrategy.
+       *
+       * Después del cambio esperamos:
+       *
+       * mustChangePassword = false
        */
       const authenticatedUser =
         await getMe(
@@ -141,13 +142,16 @@ export function ChangePasswordPage({
       onPasswordChanged(
         authenticatedUser,
       );
-    } catch (err) {
+    } catch (
+      err
+    ) {
       console.error(
         err,
       );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cambiar la contraseña.',
       );
@@ -179,7 +183,7 @@ export function ChangePasswordPage({
 
         <div className="nova-login__heading">
           <h2>
-            Cambia tu contraseña
+            Crea tu contraseña
           </h2>
 
           <p>
@@ -190,10 +194,9 @@ export function ChangePasswordPage({
           </p>
 
           <p>
-            Estás utilizando una
-            contraseña temporal.
-            Debes crear una contraseña
-            personal antes de continuar.
+            Debes crear una
+            contraseña personal
+            antes de continuar.
           </p>
         </div>
 
@@ -203,29 +206,6 @@ export function ChangePasswordPage({
             handleSubmit
           }
         >
-          <label>
-            Contraseña temporal
-
-            <input
-              type="password"
-              value={
-                currentPassword
-              }
-              onChange={(
-                event,
-              ) => {
-                setCurrentPassword(
-                  event.target.value,
-                );
-              }}
-              disabled={
-                submitting
-              }
-              autoComplete="current-password"
-              placeholder="Contraseña temporal"
-            />
-          </label>
-
           <label>
             Nueva contraseña
 
@@ -285,14 +265,13 @@ export function ChangePasswordPage({
             type="submit"
             disabled={
               submitting ||
-              !currentPassword ||
               !newPassword ||
               !confirmPassword
             }
           >
             {submitting
-              ? 'Cambiando...'
-              : 'Cambiar contraseña'}
+              ? 'Guardando...'
+              : 'Guardar contraseña'}
           </button>
 
           <button
@@ -306,8 +285,10 @@ export function ChangePasswordPage({
             style={{
               background:
                 '#ffffff',
+
               color:
                 '#374151',
+
               border:
                 '1px solid #d1d5db',
             }}

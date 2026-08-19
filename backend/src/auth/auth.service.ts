@@ -1,7 +1,14 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+
 import { JwtService } from '@nestjs/jwt';
 
 import * as bcrypt from 'bcrypt';
+
 import { createHash, randomBytes } from 'crypto';
 
 import type { User } from '../../generated/prisma/client';
@@ -22,6 +29,7 @@ type RefreshUser = User & {
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
+
     private readonly jwtService: JwtService,
   ) {}
 
@@ -33,8 +41,9 @@ export class AuthService {
     let user: User | null;
 
     /*
-     * Si viene workspaceSlug, buscamos
-     * exclusivamente dentro del Workspace.
+     * Si viene workspaceSlug,
+     * buscamos exclusivamente
+     * dentro del Workspace.
      */
     if (workspaceSlug) {
       const normalizedWorkspaceSlug = workspaceSlug.trim().toLowerCase();
@@ -53,14 +62,15 @@ export class AuthService {
         where: {
           workspaceId_username: {
             workspaceId: workspace.id,
+
             username,
           },
         },
       });
 
       /*
-       * PLATFORM_ADMIN no inicia sesión
-       * mediante Workspace.
+       * PLATFORM_ADMIN no inicia
+       * sesión mediante Workspace.
        */
       if (!user || user.role === 'PLATFORM_ADMIN' || user.status !== 'ACTIVE') {
         throw new UnauthorizedException('Credenciales inválidas');
@@ -73,8 +83,11 @@ export class AuthService {
       user = await this.prisma.user.findFirst({
         where: {
           username,
+
           role: 'PLATFORM_ADMIN',
+
           status: 'ACTIVE',
+
           workspaceId: null,
         },
       });
@@ -116,7 +129,9 @@ export class AuthService {
 
     return {
       accessToken,
+
       refreshToken,
+
       refreshExpiresAt,
     };
   }
@@ -155,8 +170,9 @@ export class AuthService {
     this.validateRefreshUser(user);
 
     /*
-     * Generamos el refresh nuevo antes
-     * de revocar el anterior.
+     * Generamos el refresh
+     * nuevo antes de revocar
+     * el anterior.
      */
     const newRefreshToken = this.generateRefreshToken();
 
@@ -167,14 +183,17 @@ export class AuthService {
     /*
      * Rotación atómica.
      *
-     * El refresh anterior solamente puede
-     * consumirse una vez.
+     * El refresh anterior
+     * solamente puede consumirse
+     * una vez.
      */
     await this.prisma.$transaction(async (transaction) => {
       const revoked = await transaction.refreshSession.updateMany({
         where: {
           id: session.id,
+
           revokedAt: null,
+
           expiresAt: {
             gt: now,
           },
@@ -226,6 +245,7 @@ export class AuthService {
       await this.prisma.refreshSession.updateMany({
         where: {
           tokenHash,
+
           revokedAt: null,
         },
 
@@ -240,11 +260,7 @@ export class AuthService {
     };
   }
 
-  async changePassword(
-    userId: string,
-    currentPassword: string,
-    newPassword: string,
-  ) {
+  async changePassword(userId: string, newPassword: string) {
     const user = await this.prisma.user.findUnique({
       where: {
         id: userId,
@@ -255,13 +271,43 @@ export class AuthService {
       throw new UnauthorizedException('Usuario no encontrado');
     }
 
-    const passwordValid = await bcrypt.compare(
-      currentPassword,
-      user.passwordHash,
-    );
+    /*
+     * Este endpoint está reservado
+     * exclusivamente para el cambio
+     * obligatorio de contraseña.
+     *
+     * Aunque alguien tenga una sesión
+     * autenticada normal, no podrá usar
+     * este endpoint para modificar la
+     * contraseña sin verificación.
+     */
+    if (!user.mustChangePassword) {
+      throw new ForbiddenException(
+        'El cambio obligatorio de contraseña ya fue completado',
+      );
+    }
 
-    if (!passwordValid) {
-      throw new UnauthorizedException('La contraseña actual es incorrecta');
+    if (typeof newPassword !== 'string' || newPassword.length < 8) {
+      throw new BadRequestException(
+        'La nueva contraseña debe tener al menos 8 caracteres',
+      );
+    }
+
+    /*
+     * No necesitamos pedir nuevamente
+     * la contraseña temporal para
+     * comprobar que la nueva sea
+     * diferente.
+     *
+     * Podemos comparar directamente
+     * la nueva contra el hash actual.
+     */
+    const samePassword = await bcrypt.compare(newPassword, user.passwordHash);
+
+    if (samePassword) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser diferente a la contraseña temporal',
+      );
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
@@ -286,17 +332,21 @@ export class AuthService {
   private async createAccessToken(user: User) {
     const payload = {
       sub: user.id,
+
       username: user.username,
+
       role: user.role,
+
       workspaceId: user.workspaceId,
     };
 
     let expiresIn = ACCESS_TOKEN_SECONDS;
 
     /*
-     * Un OWNER temporal nunca puede
-     * recibir un Access Token que viva
-     * más que su propia cuenta.
+     * Un OWNER temporal nunca
+     * puede recibir un Access Token
+     * que viva más que su propia
+     * cuenta.
      */
     if (
       user.role === 'OWNER' &&
@@ -323,8 +373,9 @@ export class AuthService {
     const normalExpiration = new Date(Date.now() + REFRESH_TOKEN_DURATION_MS);
 
     /*
-     * El refresh de un OWNER temporal
-     * tampoco puede superar expiresAt.
+     * El refresh de un OWNER
+     * temporal tampoco puede
+     * superar expiresAt.
      */
     if (
       user.role === 'OWNER' &&
