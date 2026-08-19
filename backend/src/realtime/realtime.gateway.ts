@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
 
 import { PrismaService } from '../prisma/prisma.service';
+
 import { VisitorsService } from '../visitors/visitors.service';
 
 @WebSocketGateway({
@@ -25,7 +26,9 @@ export class RealtimeGateway {
 
   constructor(
     private readonly prisma: PrismaService,
+
     private readonly jwtService: JwtService,
+
     private readonly visitorsService: VisitorsService,
   ) {}
 
@@ -83,8 +86,9 @@ export class RealtimeGateway {
     const visitorId = this.getVerifiedVisitorId(verifiedVisitor);
 
     /*
-     * No confiamos en que el token por sí solo
-     * nos entregue la página actual.
+     * No confiamos en que el token
+     * por sí solo nos entregue
+     * la página actual.
      *
      * Volvemos a DB para comprobar:
      *
@@ -95,11 +99,13 @@ export class RealtimeGateway {
     const visitor = await this.prisma.visitor.findFirst({
       where: {
         id: visitorId,
+
         workspaceId: workspace.id,
       },
 
       select: {
         id: true,
+
         siteId: true,
       },
     });
@@ -111,7 +117,9 @@ export class RealtimeGateway {
     const site = await this.prisma.site.findFirst({
       where: {
         id: visitor.siteId,
+
         workspaceId: workspace.id,
+
         status: 'ACTIVE',
       },
     });
@@ -204,6 +212,20 @@ export class RealtimeGateway {
       throw new WsException('Agente sin página asignada');
     }
 
+    /*
+     * IMPORTANTE:
+     *
+     * Una conversación CLOSED también
+     * puede abrirse para consultar su
+     * historial.
+     *
+     * No filtramos por status aquí.
+     *
+     * Eso NO permite responder una
+     * conversación cerrada: los endpoints
+     * de mensajes siguen aplicando sus
+     * propias restricciones.
+     */
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: data.conversationId,
@@ -220,10 +242,6 @@ export class RealtimeGateway {
             assignedAgentId: user.id,
           },
         ],
-
-        status: {
-          in: ['OPEN', 'PENDING'],
-        },
       },
     });
 
@@ -299,8 +317,9 @@ export class RealtimeGateway {
     }
 
     /*
-     * OWNER / ADMIN / AGENT solamente
-     * pueden usar su propio Workspace.
+     * OWNER / ADMIN / AGENT
+     * solamente pueden usar
+     * su propio Workspace.
      */
     if (user.workspaceId !== workspace.id) {
       throw new WsException('No tienes acceso a este workspace');
@@ -315,8 +334,8 @@ export class RealtimeGateway {
      *
      * workspace:{workspaceId}
      *
-     * Recibe todas las páginas de
-     * su empresa.
+     * Recibe todas las páginas
+     * de su empresa.
      */
     if (user.role === 'OWNER') {
       const room = `workspace:${workspace.id}`;
@@ -341,8 +360,8 @@ export class RealtimeGateway {
      *
      * site:{siteId}
      *
-     * Nunca entra en la room general
-     * del Workspace.
+     * Nunca entra en la room
+     * general del Workspace.
      */
     if (user.role === 'ADMIN') {
       if (!user.siteId) {
@@ -447,6 +466,7 @@ export class RealtimeGateway {
 
       include: {
         workspace: true,
+
         site: true,
       },
     });
@@ -479,7 +499,8 @@ export class RealtimeGateway {
 
     /*
      * ADMIN y AGENT deben pertenecer
-     * a un Site activo del mismo Workspace.
+     * a un Site activo del mismo
+     * Workspace.
      */
     if (user.role === 'ADMIN' || user.role === 'AGENT') {
       if (!user.siteId || !user.site) {
@@ -630,11 +651,12 @@ export class RealtimeGateway {
   }
 
   /*
-   * Alias seguro para código que todavía
-   * utilice el nombre anterior.
+   * Alias seguro para código
+   * que todavía utilice el
+   * nombre anterior.
    *
-   * El argumento ahora representa siteId,
-   * NO workspaceId.
+   * El argumento ahora representa
+   * siteId, NO workspaceId.
    */
   emitToUnassigned(siteId: string, event: string, data: unknown) {
     this.emitToSiteUnassigned(siteId, event, data);

@@ -4,6 +4,10 @@ import {
   useState,
 } from 'react';
 
+import type {
+  SyntheticEvent,
+} from 'react';
+
 import {
   NOVA_API_URL,
   getStoredAccessToken,
@@ -13,10 +17,6 @@ import {
 import type {
   AuthUser,
 } from '../auth/auth';
-
-import type {
-  SyntheticEvent,
-} from 'react';
 
 import {
   activateSite,
@@ -52,13 +52,180 @@ type AdminPageProps = {
   onLogout: () => void;
 };
 
+type ConversationWithSite =
+  ConversationSummary & {
+    siteId?: string | null;
+  };
+
 function sortConversations(
-  conversations: ConversationSummary[],
+  conversations:
+    ConversationSummary[],
 ) {
-  return [...conversations].sort(
-    (a, b) =>
-      new Date(b.updatedAt).getTime() -
-      new Date(a.updatedAt).getTime(),
+  return [
+    ...conversations,
+  ].sort(
+    (
+      a,
+      b,
+    ) =>
+      new Date(
+        b.updatedAt,
+      ).getTime() -
+      new Date(
+        a.updatedAt,
+      ).getTime(),
+  );
+}
+
+function formatTime(
+  value: string,
+) {
+  return new Intl.DateTimeFormat(
+    'es-CL',
+    {
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+
+      hour12:
+        false,
+    },
+  ).format(
+    new Date(
+      value,
+    ),
+  );
+}
+
+function formatDateTime(
+  value: string,
+) {
+  return new Intl.DateTimeFormat(
+    'es-CL',
+    {
+      day:
+        '2-digit',
+
+      month:
+        '2-digit',
+
+      year:
+        '2-digit',
+
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+
+      hour12:
+        false,
+    },
+  ).format(
+    new Date(
+      value,
+    ),
+  );
+}
+
+function getConversationStatusLabel(
+  status:
+    ConversationSummary['status'],
+) {
+  if (
+    status ===
+    'OPEN'
+  ) {
+    return 'Abierta';
+  }
+
+  if (
+    status ===
+    'PENDING'
+  ) {
+    return 'Pendiente';
+  }
+
+  return 'Cerrada';
+}
+
+function getLastMessage(
+  conversation:
+    ConversationSummary,
+) {
+  const message =
+    conversation
+      .messages[0];
+
+  if (
+    !message
+  ) {
+    return 'Sin mensajes';
+  }
+
+  if (
+    message.type ===
+    'IMAGE'
+  ) {
+    return message.content
+      ? `📷 ${message.content}`
+      : '📷 Imagen';
+  }
+
+  return (
+    message.content ??
+    'Mensaje'
+  );
+}
+
+function ConversationStatus({
+  status,
+}: {
+  status:
+    ConversationSummary['status'];
+}) {
+  return (
+    <span
+      className={
+        status ===
+        'OPEN'
+          ? 'nova-admin-status nova-admin-status--active'
+          : status ===
+              'PENDING'
+            ? 'nova-admin-status nova-admin-status--pending'
+            : 'nova-admin-status nova-admin-status--inactive'
+      }
+    >
+      {getConversationStatusLabel(
+        status,
+      )}
+    </span>
+  );
+}
+
+function EntityStatus({
+  status,
+}: {
+  status: string;
+}) {
+  const active =
+    status ===
+    'ACTIVE';
+
+  return (
+    <span
+      className={
+        active
+          ? 'nova-admin-status nova-admin-status--active'
+          : 'nova-admin-status nova-admin-status--inactive'
+      }
+    >
+      {active
+        ? 'Activo'
+        : 'Inactivo'}
+    </span>
   );
 }
 
@@ -75,26 +242,32 @@ async function fetchAdminData(
     conversations,
     users,
     sites,
-  ] = await Promise.all([
-    getConversations(
-      accessToken,
-      workspaceId,
-    ),
+  ] =
+    await Promise.all([
+      getConversations(
+        accessToken,
+        workspaceId,
+      ),
 
-    getWorkspaceUsers(
-      accessToken,
-      workspaceId,
-    ),
+      getWorkspaceUsers(
+        accessToken,
+        workspaceId,
+      ),
 
-    getSites(
-      accessToken,
-      workspaceId,
-    ),
-  ]);
+      getSites(
+        accessToken,
+        workspaceId,
+      ),
+    ]);
 
   return {
-    conversations,
+    conversations:
+      sortConversations(
+        conversations,
+      ),
+
     users,
+
     sites,
   };
 }
@@ -104,12 +277,13 @@ export function AdminPage({
   onLogout,
 }: AdminPageProps) {
   const workspaceId =
-    user.workspaceId ?? '';
+    user.workspaceId ??
+    '';
 
   const activeConversationIdRef =
-    useRef<string | null>(
-      null,
-    );
+    useRef<
+      string | null
+    >(null);
 
   const [
     conversations,
@@ -131,7 +305,9 @@ export function AdminPage({
     loadingConversation,
     setLoadingConversation,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     users,
@@ -154,13 +330,19 @@ export function AdminPage({
     setSelectedAgents,
   ] =
     useState<
-      Record<string, string>
+      Record<
+        string,
+        string
+      >
     >({});
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(
+      true,
+    );
 
   const [
     assigningConversationId,
@@ -181,32 +363,37 @@ export function AdminPage({
   const [
     notification,
     setNotification,
-  ] = useState<string | null>(
-    null,
-  );
+  ] =
+    useState<
+      string | null
+    >(null);
 
   const notificationTimeoutRef =
-    useRef<number | null>(
-      null,
-    );
+    useRef<
+      number | null
+    >(null);
 
   const [
     newAgentUsername,
     setNewAgentUsername,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     creatingAgent,
     setCreatingAgent,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
   const [
     managingUserId,
     setManagingUserId,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   const [
     createdAgent,
@@ -215,50 +402,63 @@ export function AdminPage({
     useState<{
       username: string;
       password: string;
-    } | null>(null);
+    } | null>(
+      null,
+    );
 
   const [
     newAdminUsername,
     setNewAdminUsername,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     selectedAdminSiteId,
     setSelectedAdminSiteId,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     newSiteName,
     setNewSiteName,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     newSiteSlug,
     setNewSiteSlug,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     newSiteDomain,
     setNewSiteDomain,
-  ] = useState('');
+  ] =
+    useState('');
 
   const [
     creatingSite,
     setCreatingSite,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
   const [
     managingSiteId,
     setManagingSiteId,
   ] =
-    useState<string | null>(
-      null,
-    );
+    useState<
+      string | null
+    >(null);
 
   const [
     creatingAdmin,
     setCreatingAdmin,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
   const [
     createdAdmin,
@@ -267,11 +467,15 @@ export function AdminPage({
     useState<{
       username: string;
       password: string;
-    } | null>(null);
+    } | null>(
+      null,
+    );
 
   const agents =
     users.filter(
-      (workspaceUser) =>
+      (
+        workspaceUser,
+      ) =>
         workspaceUser.role ===
           'AGENT' &&
         workspaceUser.status ===
@@ -280,36 +484,68 @@ export function AdminPage({
 
   const allAgents =
     users.filter(
-      (workspaceUser) =>
+      (
+        workspaceUser,
+      ) =>
         workspaceUser.role ===
         'AGENT',
     );
 
   const admins =
     users.filter(
-      (workspaceUser) =>
+      (
+        workspaceUser,
+      ) =>
         workspaceUser.role ===
         'ADMIN',
     );
 
   const activeSites =
     sites.filter(
-      (site) =>
+      (
+        site,
+      ) =>
         site.status ===
         'ACTIVE',
     );
 
+  const activeConversationCount =
+    conversations.filter(
+      (
+        conversation,
+      ) =>
+        conversation.status !==
+        'CLOSED',
+    ).length;
+
+  const unassignedConversationCount =
+    conversations.filter(
+      (
+        conversation,
+      ) =>
+        conversation.assignedAgentId ===
+          null &&
+        conversation.status !==
+          'CLOSED',
+    ).length;
+
   function getSiteName(
-    siteId: string | null,
+    siteId:
+      string | null,
   ) {
-    if (!siteId) {
+    if (
+      !siteId
+    ) {
       return 'Sin página';
     }
 
     return (
       sites.find(
-        (site) =>
-          site.id === siteId,
+        (
+          site,
+        ) =>
+          site.id ===
+          siteId,
       )?.name ??
       'Página desconocida'
     );
@@ -319,11 +555,13 @@ export function AdminPage({
     message: string,
   ) {
     if (
-      notificationTimeoutRef.current !==
+      notificationTimeoutRef
+        .current !==
       null
     ) {
       window.clearTimeout(
-        notificationTimeoutRef.current,
+        notificationTimeoutRef
+          .current,
       );
     }
 
@@ -349,11 +587,13 @@ export function AdminPage({
     () => {
       return () => {
         if (
-          notificationTimeoutRef.current !==
+          notificationTimeoutRef
+            .current !==
           null
         ) {
           window.clearTimeout(
-            notificationTimeoutRef.current,
+            notificationTimeoutRef
+              .current,
           );
         }
       };
@@ -364,22 +604,31 @@ export function AdminPage({
   useEffect(
     () => {
       activeConversationIdRef.current =
-        activeConversation?.id ??
+        activeConversation
+          ?.id ??
         null;
     },
     [
-      activeConversation?.id,
+      activeConversation
+        ?.id,
     ],
   );
 
   async function loadData() {
-    if (!workspaceId) {
+    if (
+      !workspaceId
+    ) {
       return;
     }
 
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(
+        true,
+      );
+
+      setError(
+        null,
+      );
 
       const data =
         await fetchAdminData(
@@ -397,75 +646,106 @@ export function AdminPage({
       setSites(
         data.sites,
       );
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cargar la administración',
       );
     } finally {
-      setLoading(false);
+      setLoading(
+        false,
+      );
     }
   }
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(
+    () => {
+      let cancelled =
+        false;
 
-    async function loadInitialData() {
-      if (!workspaceId) {
-        return;
-      }
+      async function loadInitialData() {
+        if (
+          !workspaceId
+        ) {
+          return;
+        }
 
-      try {
-        const data =
-          await fetchAdminData(
-            workspaceId,
+        try {
+          const data =
+            await fetchAdminData(
+              workspaceId,
+            );
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setConversations(
+            data.conversations,
           );
 
-        if (cancelled) {
-          return;
-        }
+          setUsers(
+            data.users,
+          );
 
-        setConversations(
-          data.conversations,
-        );
+          setSites(
+            data.sites,
+          );
 
-        setUsers(
-          data.users,
-        );
+          setError(
+            null,
+          );
+        } catch (
+          err
+        ) {
+          if (
+            cancelled
+          ) {
+            return;
+          }
 
-        setSites(
-          data.sites,
-        );
+          console.error(
+            err,
+          );
 
-        setError(null);
-      } catch (err) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : 'No se pudo cargar la administración',
-        );
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
+          setError(
+            err instanceof
+              Error
+              ? err.message
+              : 'No se pudo cargar la administración',
+          );
+        } finally {
+          if (
+            !cancelled
+          ) {
+            setLoading(
+              false,
+            );
+          }
         }
       }
-    }
 
-    void loadInitialData();
+      void loadInitialData();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaceId]);
+      return () => {
+        cancelled =
+          true;
+      };
+    },
+    [
+      workspaceId,
+    ],
+  );
 
   useEffect(
     () => {
@@ -485,7 +765,9 @@ export function AdminPage({
         getStoredAccessToken() ??
         '';
 
-      if (!accessToken) {
+      if (
+        !accessToken
+      ) {
         onLogout();
 
         return;
@@ -508,7 +790,9 @@ export function AdminPage({
               workspaceId,
             );
 
-          if (cancelled) {
+          if (
+            cancelled
+          ) {
             return;
           }
 
@@ -517,8 +801,12 @@ export function AdminPage({
               latestConversations,
             ),
           );
-        } catch (err) {
-          if (cancelled) {
+        } catch (
+          err
+        ) {
+          if (
+            cancelled
+          ) {
             return;
           }
 
@@ -528,7 +816,8 @@ export function AdminPage({
           );
 
           setError(
-            err instanceof Error
+            err instanceof
+              Error
               ? err.message
               : 'No se pudieron actualizar las conversaciones',
           );
@@ -536,7 +825,8 @@ export function AdminPage({
       }
 
       async function refreshOpenConversation(
-        conversationId: string,
+        conversationId:
+          string,
       ) {
         try {
           const validAccessToken =
@@ -564,8 +854,12 @@ export function AdminPage({
           setActiveConversation(
             conversation,
           );
-        } catch (err) {
-          if (cancelled) {
+        } catch (
+          err
+        ) {
+          if (
+            cancelled
+          ) {
             return;
           }
 
@@ -582,32 +876,24 @@ export function AdminPage({
           workspaceId,
           {
             onWorkspaceJoined() {
-              if (cancelled) {
+              if (
+                cancelled
+              ) {
                 return;
               }
 
-              /*
-               * Socket no es retroactivo.
-               *
-               * Cada vez que conecta o
-               * reconecta, sincronizamos
-               * nuevamente mediante REST.
-               */
               void syncConversations();
             },
 
             onConversationUpdated(
               conversation,
             ) {
-              if (cancelled) {
+              if (
+                cancelled
+              ) {
                 return;
               }
 
-              /*
-               * Añadimos una conversación
-               * nueva o reemplazamos una
-               * existente.
-               */
               setConversations(
                 (
                   currentConversations,
@@ -628,10 +914,6 @@ export function AdminPage({
                 },
               );
 
-              /*
-               * Si tenemos ese chat abierto,
-               * pedimos el detalle completo.
-               */
               if (
                 activeConversationIdRef
                   .current ===
@@ -646,7 +928,9 @@ export function AdminPage({
             onError(
               message,
             ) {
-              if (cancelled) {
+              if (
+                cancelled
+              ) {
                 return;
               }
 
@@ -678,9 +962,12 @@ export function AdminPage({
     event.preventDefault();
 
     const username =
-      newAdminUsername.trim();
+      newAdminUsername
+        .trim();
 
-    if (!username) {
+    if (
+      !username
+    ) {
       setError(
         'Escribe un nombre de usuario',
       );
@@ -688,7 +975,9 @@ export function AdminPage({
       return;
     }
 
-    if (!selectedAdminSiteId) {
+    if (
+      !selectedAdminSiteId
+    ) {
       setError(
         'Selecciona una página para el administrador',
       );
@@ -697,9 +986,17 @@ export function AdminPage({
     }
 
     try {
-      setCreatingAdmin(true);
-      setError(null);
-      setCreatedAdmin(null);
+      setCreatingAdmin(
+        true,
+      );
+
+      setError(
+        null,
+      );
+
+      setCreatedAdmin(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -723,20 +1020,32 @@ export function AdminPage({
           created.password,
       });
 
-      setNewAdminUsername('');
-      setSelectedAdminSiteId('');
+      setNewAdminUsername(
+        '',
+      );
+
+      setSelectedAdminSiteId(
+        '',
+      );
 
       await loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo crear el administrador',
       );
     } finally {
-      setCreatingAdmin(false);
+      setCreatingAdmin(
+        false,
+      );
     }
   }
 
@@ -747,9 +1056,12 @@ export function AdminPage({
     event.preventDefault();
 
     const name =
-      newSiteName.trim();
+      newSiteName
+        .trim();
 
-    if (!name) {
+    if (
+      !name
+    ) {
       setError(
         'Escribe un nombre para la página',
       );
@@ -758,8 +1070,13 @@ export function AdminPage({
     }
 
     try {
-      setCreatingSite(true);
-      setError(null);
+      setCreatingSite(
+        true,
+      );
+
+      setError(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -774,30 +1091,47 @@ export function AdminPage({
           name,
 
           slug:
-            newSiteSlug.trim() ||
+            newSiteSlug
+              .trim() ||
             undefined,
 
           domain:
-            newSiteDomain.trim() ||
+            newSiteDomain
+              .trim() ||
             undefined,
         },
       );
 
-      setNewSiteName('');
-      setNewSiteSlug('');
-      setNewSiteDomain('');
+      setNewSiteName(
+        '',
+      );
+
+      setNewSiteSlug(
+        '',
+      );
+
+      setNewSiteDomain(
+        '',
+      );
 
       await loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo crear la página',
       );
     } finally {
-      setCreatingSite(false);
+      setCreatingSite(
+        false,
+      );
     }
   }
 
@@ -809,7 +1143,9 @@ export function AdminPage({
         site.id,
       );
 
-      setError(null);
+      setError(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -840,20 +1176,29 @@ export function AdminPage({
         site.status ===
           'ACTIVE'
       ) {
-        setSelectedAdminSiteId('');
+        setSelectedAdminSiteId(
+          '',
+        );
       }
 
       await loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cambiar el estado de la página',
       );
     } finally {
-      setManagingSiteId(null);
+      setManagingSiteId(
+        null,
+      );
     }
   }
 
@@ -864,9 +1209,12 @@ export function AdminPage({
     event.preventDefault();
 
     const username =
-      newAgentUsername.trim();
+      newAgentUsername
+        .trim();
 
-    if (!username) {
+    if (
+      !username
+    ) {
       setError(
         'Escribe un nombre de usuario',
       );
@@ -875,9 +1223,17 @@ export function AdminPage({
     }
 
     try {
-      setCreatingAgent(true);
-      setError(null);
-      setCreatedAgent(null);
+      setCreatingAgent(
+        true,
+      );
+
+      setError(
+        null,
+      );
+
+      setCreatedAgent(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -900,19 +1256,28 @@ export function AdminPage({
           created.password,
       });
 
-      setNewAgentUsername('');
+      setNewAgentUsername(
+        '',
+      );
 
       await loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo crear el agente',
       );
     } finally {
-      setCreatingAgent(false);
+      setCreatingAgent(
+        false,
+      );
     }
   }
 
@@ -925,7 +1290,9 @@ export function AdminPage({
         targetUser.id,
       );
 
-      setError(null);
+      setError(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -951,28 +1318,38 @@ export function AdminPage({
       }
 
       await loadData();
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cambiar el estado del usuario',
       );
     } finally {
-      setManagingUserId(null);
+      setManagingUserId(
+        null,
+      );
     }
   }
 
   async function handleOpenConversation(
-    conversationId: string,
+    conversationId:
+      string,
   ) {
     try {
       setLoadingConversation(
         true,
       );
 
-      setError(null);
+      setError(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -990,11 +1367,16 @@ export function AdminPage({
       setActiveConversation(
         conversation,
       );
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo cargar la conversación',
       );
@@ -1013,10 +1395,13 @@ export function AdminPage({
       selectedAgents[
         conversation.id
       ] ??
-      conversation.assignedAgentId ??
+      conversation
+        .assignedAgentId ??
       '';
 
-    if (!agentId) {
+    if (
+      !agentId
+    ) {
       setError(
         'Selecciona un agente',
       );
@@ -1026,7 +1411,9 @@ export function AdminPage({
 
     const selectedAgent =
       users.find(
-        (workspaceUser) =>
+        (
+          workspaceUser,
+        ) =>
           workspaceUser.id ===
           agentId,
       );
@@ -1034,16 +1421,14 @@ export function AdminPage({
     const conversationSiteId =
       (
         conversation as
-          ConversationSummary & {
-            siteId?:
-              string | null;
-          }
+          ConversationWithSite
       ).siteId ??
       null;
 
     if (
       conversationSiteId &&
-      selectedAgent?.siteId !==
+      selectedAgent
+        ?.siteId !==
         conversationSiteId
     ) {
       setError(
@@ -1055,7 +1440,8 @@ export function AdminPage({
 
     const wasAssigned =
       Boolean(
-        conversation.assignedAgentId,
+        conversation
+          .assignedAgentId,
       );
 
     try {
@@ -1063,7 +1449,9 @@ export function AdminPage({
         conversation.id,
       );
 
-      setError(null);
+      setError(
+        null,
+      );
 
       const accessToken =
         await getValidAccessToken(
@@ -1087,18 +1475,24 @@ export function AdminPage({
       await loadData();
 
       if (
-        activeConversation?.id ===
+        activeConversation
+          ?.id ===
         conversation.id
       ) {
         await handleOpenConversation(
           conversation.id,
         );
       }
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo asignar la conversación',
       );
@@ -1109,25 +1503,33 @@ export function AdminPage({
     }
   }
 
-  if (!workspaceId) {
+  if (
+    !workspaceId
+  ) {
     return (
-      <main className="nova-dashboard">
+      <main className="nova-loading">
         Workspace no disponible.
       </main>
     );
   }
 
   return (
-    <main className="nova-dashboard">
-      <header className="nova-dashboard__header">
+    <main className="nova-dashboard nova-admin-page">
+      <header className="nova-dashboard__header nova-admin-topbar">
         <div className="nova-dashboard__brand">
           <div className="nova-dashboard__logo">
             N
           </div>
 
-          <strong>
-            Nova Administración
-          </strong>
+          <div className="nova-admin-topbar__brand-text">
+            <strong>
+              Nova
+            </strong>
+
+            <span>
+              Administración
+            </span>
+          </div>
         </div>
 
         <div className="nova-dashboard__user">
@@ -1143,92 +1545,227 @@ export function AdminPage({
 
           <button
             type="button"
-            onClick={onLogout}
+            onClick={
+              onLogout
+            }
           >
-            Cerrar sesión
+            Salir
           </button>
         </div>
       </header>
 
-      <section className="nova-dashboard__content">
-        <div className="nova-dashboard__welcome">
+      <section className="nova-admin-shell">
+        <div className="nova-admin-heading">
           <div>
+            <span className="nova-admin-heading__eyebrow">
+              {user.role ===
+              'OWNER'
+                ? 'Workspace'
+                : 'Página'}
+            </span>
+
             <h1>
-              Conversaciones
+              Panel de administración
             </h1>
 
             <p>
-              Visualiza, asigna o
-              reasigna conversaciones
-              a los agentes del
-              workspace.
+              {user.role ===
+              'OWNER'
+                ? 'Gestiona páginas, administradores, agentes y conversaciones desde un solo lugar.'
+                : 'Gestiona tus agentes y las conversaciones de tu página.'}
             </p>
+          </div>
+
+          <button
+            type="button"
+            className="nova-admin-refresh"
+            disabled={
+              loading
+            }
+            onClick={() => {
+              void loadData();
+            }}
+          >
+            <span>
+              ↻
+            </span>
+
+            {loading
+              ? 'Actualizando...'
+              : 'Actualizar'}
+          </button>
+        </div>
+
+        {error ? (
+          <div
+            className="nova-admin-error"
+            role="alert"
+          >
+            <div>
+              <strong>
+                No se pudo completar la operación
+              </strong>
+
+              <span>
+                {error}
+              </span>
+            </div>
 
             <button
               type="button"
+              aria-label="Cerrar error"
               onClick={() => {
-                void loadData();
+                setError(
+                  null,
+                );
               }}
-              disabled={loading}
             >
-              {loading
-                ? 'Actualizando...'
-                : 'Actualizar'}
+              ×
             </button>
           </div>
+        ) : null}
 
-          {error ? (
-            <p role="alert">
-              {error}
-            </p>
-          ) : null}
+        <div className="nova-admin-overview">
+          <div className="nova-admin-stat">
+            <div className="nova-admin-stat__icon">
+              💬
+            </div>
+
+            <div>
+              <span>
+                Conversaciones
+              </span>
+
+              <strong>
+                {
+                  conversations.length
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="nova-admin-stat">
+            <div className="nova-admin-stat__icon">
+              ●
+            </div>
+
+            <div>
+              <span>
+                Activas
+              </span>
+
+              <strong>
+                {
+                  activeConversationCount
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="nova-admin-stat">
+            <div className="nova-admin-stat__icon">
+              ⏱
+            </div>
+
+            <div>
+              <span>
+                Sin asignar
+              </span>
+
+              <strong>
+                {
+                  unassignedConversationCount
+                }
+              </strong>
+            </div>
+          </div>
+
+          <div className="nova-admin-stat">
+            <div className="nova-admin-stat__icon">
+              👤
+            </div>
+
+            <div>
+              <span>
+                Agentes activos
+              </span>
+
+              <strong>
+                {
+                  agents.length
+                }
+              </strong>
+            </div>
+          </div>
 
           {user.role ===
           'OWNER' ? (
-            <>
-              <div
-                style={{
-                  marginTop:
-                    '20px',
+            <div className="nova-admin-stat">
+              <div className="nova-admin-stat__icon">
+                ◫
+              </div>
 
-                  padding:
-                    '16px',
+              <div>
+                <span>
+                  Páginas activas
+                </span>
 
-                  border:
-                    '1px solid #e5e7eb',
-
-                  borderRadius:
-                    '12px',
-                }}
-              >
-                <h2>
-                  Gestión de páginas
-                </h2>
-
-                <form
-                  onSubmit={
-                    handleCreateSite
+                <strong>
+                  {
+                    activeSites.length
                   }
-                  style={{
-                    display:
-                      'flex',
+                </strong>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
-                    flexWrap:
-                      'wrap',
+        {user.role ===
+        'OWNER' ? (
+          <section className="nova-admin-management-grid">
+            <article className="nova-admin-panel">
+              <div className="nova-admin-panel__header">
+                <div>
+                  <span className="nova-admin-panel__icon">
+                    ◫
+                  </span>
 
-                    gap:
-                      '8px',
+                  <div>
+                    <h2>
+                      Páginas
+                    </h2>
 
-                    marginBottom:
-                      '16px',
-                  }}
-                >
+                    <p>
+                      Gestiona los sitios conectados a Nova.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="nova-admin-panel__count">
+                  {
+                    sites.length
+                  }
+                </span>
+              </div>
+
+              <form
+                className="nova-admin-form nova-admin-form--site"
+                onSubmit={
+                  handleCreateSite
+                }
+              >
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-site-name">
+                    Nombre
+                  </label>
+
                   <input
+                    id="nova-site-name"
                     type="text"
                     value={
                       newSiteName
                     }
-                    placeholder="Nombre de página"
+                    placeholder="Ej. Sitio principal"
                     onChange={(
                       event,
                     ) => {
@@ -1237,13 +1774,20 @@ export function AdminPage({
                       );
                     }}
                   />
+                </div>
+
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-site-slug">
+                    Slug
+                  </label>
 
                   <input
+                    id="nova-site-slug"
                     type="text"
                     value={
                       newSiteSlug
                     }
-                    placeholder="Slug opcional"
+                    placeholder="Opcional"
                     onChange={(
                       event,
                     ) => {
@@ -1252,13 +1796,20 @@ export function AdminPage({
                       );
                     }}
                   />
+                </div>
+
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-site-domain">
+                    Dominio
+                  </label>
 
                   <input
+                    id="nova-site-domain"
                     type="text"
                     value={
                       newSiteDomain
                     }
-                    placeholder="Dominio opcional"
+                    placeholder="Opcional"
                     onChange={(
                       event,
                     ) => {
@@ -1267,25 +1818,33 @@ export function AdminPage({
                       );
                     }}
                   />
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={
-                      creatingSite
-                    }
-                  >
-                    {creatingSite
-                      ? 'Creando...'
-                      : 'Crear página'}
-                  </button>
-                </form>
+                <button
+                  type="submit"
+                  className="nova-admin-primary-button"
+                  disabled={
+                    creatingSite
+                  }
+                >
+                  {creatingSite
+                    ? 'Creando...'
+                    : 'Crear página'}
+                </button>
+              </form>
 
+              <div className="nova-admin-list">
                 {sites.length ===
                 0 ? (
-                  <p>
-                    No hay páginas
-                    creadas.
-                  </p>
+                  <div className="nova-admin-empty">
+                    <strong>
+                      Sin páginas
+                    </strong>
+
+                    <span>
+                      Crea la primera página para comenzar.
+                    </span>
+                  </div>
                 ) : (
                   sites.map(
                     (
@@ -1295,56 +1854,59 @@ export function AdminPage({
                         key={
                           site.id
                         }
-                        style={{
-                          display:
-                            'flex',
-
-                          justifyContent:
-                            'space-between',
-
-                          alignItems:
-                            'center',
-
-                          gap:
-                            '12px',
-
-                          padding:
-                            '10px 0',
-
-                          borderBottom:
-                            '1px solid #e5e7eb',
-                        }}
+                        className="nova-admin-list-row"
                       >
-                        <div>
-                          <strong>
-                            {
-                              site.name
-                            }
-                          </strong>
-
-                          <div>
-                            Slug:{' '}
-                            {
-                              site.slug
-                            }
+                        <div className="nova-admin-list-row__main">
+                          <div className="nova-admin-list-row__avatar">
+                            {site.name
+                              .slice(
+                                0,
+                                2,
+                              )
+                              .toUpperCase()}
                           </div>
 
-                          <div>
-                            Dominio:{' '}
-                            {site.domain ??
-                              'Sin dominio'}
-                          </div>
+                          <div className="nova-admin-list-row__content">
+                            <div className="nova-admin-list-row__title">
+                              <strong>
+                                {
+                                  site.name
+                                }
+                              </strong>
 
-                          <div>
-                            Estado:{' '}
-                            {
-                              site.status
-                            }
+                              <EntityStatus
+                                status={
+                                  site.status
+                                }
+                              />
+                            </div>
+
+                            <div className="nova-admin-list-row__meta">
+                              <span>
+                                Slug:{' '}
+                                <strong>
+                                  {
+                                    site.slug
+                                  }
+                                </strong>
+                              </span>
+
+                              <span>
+                                {site.domain ??
+                                  'Sin dominio configurado'}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
                         <button
                           type="button"
+                          className={
+                            site.status ===
+                            'ACTIVE'
+                              ? 'nova-admin-secondary-button nova-admin-secondary-button--danger'
+                              : 'nova-admin-secondary-button'
+                          }
                           disabled={
                             managingSiteId ===
                             site.id
@@ -1368,45 +1930,46 @@ export function AdminPage({
                   )
                 )}
               </div>
+            </article>
 
-              <div
-                style={{
-                  marginTop:
-                    '20px',
+            <article className="nova-admin-panel">
+              <div className="nova-admin-panel__header">
+                <div>
+                  <span className="nova-admin-panel__icon">
+                    👤
+                  </span>
 
-                  padding:
-                    '16px',
+                  <div>
+                    <h2>
+                      Administradores
+                    </h2>
 
-                  border:
-                    '1px solid #e5e7eb',
+                    <p>
+                      Asigna un administrador a cada página.
+                    </p>
+                  </div>
+                </div>
 
-                  borderRadius:
-                    '12px',
-                }}
-              >
-                <h2>
-                  Gestión de administradores
-                </h2>
-
-                <form
-                  onSubmit={
-                    handleCreateAdmin
+                <span className="nova-admin-panel__count">
+                  {
+                    admins.length
                   }
-                  style={{
-                    display:
-                      'flex',
+                </span>
+              </div>
 
-                    flexWrap:
-                      'wrap',
+              <form
+                className="nova-admin-form nova-admin-form--admin"
+                onSubmit={
+                  handleCreateAdmin
+                }
+              >
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-admin-username">
+                    Usuario
+                  </label>
 
-                    gap:
-                      '8px',
-
-                    marginBottom:
-                      '16px',
-                  }}
-                >
                   <input
+                    id="nova-admin-username"
                     type="text"
                     value={
                       newAdminUsername
@@ -1420,8 +1983,15 @@ export function AdminPage({
                       );
                     }}
                   />
+                </div>
+
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-admin-site">
+                    Página
+                  </label>
 
                   <select
+                    id="nova-admin-site"
                     value={
                       selectedAdminSiteId
                     }
@@ -1434,7 +2004,7 @@ export function AdminPage({
                     }}
                   >
                     <option value="">
-                      Selecciona página
+                      Selecciona una página
                     </option>
 
                     {activeSites.map(
@@ -1456,79 +2026,98 @@ export function AdminPage({
                       ),
                     )}
                   </select>
+                </div>
 
-                  <button
-                    type="submit"
-                    disabled={
-                      creatingAdmin ||
-                      activeSites.length ===
-                        0
-                    }
-                  >
-                    {creatingAdmin
-                      ? 'Creando...'
-                      : 'Crear administrador'}
-                  </button>
-                </form>
+                <button
+                  type="submit"
+                  className="nova-admin-primary-button"
+                  disabled={
+                    creatingAdmin ||
+                    activeSites.length ===
+                      0
+                  }
+                >
+                  {creatingAdmin
+                    ? 'Creando...'
+                    : 'Crear administrador'}
+                </button>
+              </form>
 
-                {activeSites.length ===
-                0 ? (
-                  <p>
-                    Necesitas al menos
-                    una página activa para
-                    crear administradores.
-                  </p>
-                ) : null}
+              {activeSites.length ===
+              0 ? (
+                <div className="nova-admin-info">
+                  Necesitas al menos una página activa para crear administradores.
+                </div>
+              ) : null}
 
-                {createdAdmin ? (
-                  <div>
+              {createdAdmin ? (
+                <div className="nova-admin-credentials">
+                  <div className="nova-admin-credentials__icon">
+                    ✓
+                  </div>
+
+                  <div className="nova-admin-credentials__content">
                     <strong>
                       Administrador creado
                     </strong>
 
-                    <p>
-                      Usuario:{' '}
-                      <strong>
-                        {
-                          createdAdmin.username
-                        }
-                      </strong>
-                    </p>
+                    <span>
+                      Guarda estas credenciales antes de cerrar este aviso.
+                    </span>
 
-                    <p>
-                      Contraseña temporal:{' '}
-                      <strong>
-                        {
-                          createdAdmin.password
-                        }
-                      </strong>
-                    </p>
+                    <dl>
+                      <div>
+                        <dt>
+                          Usuario
+                        </dt>
 
-                    <p>
-                      Guarda esta
-                      contraseña antes de
-                      continuar.
-                    </p>
+                        <dd>
+                          {
+                            createdAdmin.username
+                          }
+                        </dd>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCreatedAdmin(
-                          null,
-                        );
-                      }}
-                    >
-                      Ocultar
-                    </button>
+                      <div>
+                        <dt>
+                          Contraseña temporal
+                        </dt>
+
+                        <dd>
+                          {
+                            createdAdmin.password
+                          }
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
-                ) : null}
 
+                  <button
+                    type="button"
+                    aria-label="Ocultar credenciales"
+                    onClick={() => {
+                      setCreatedAdmin(
+                        null,
+                      );
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="nova-admin-list">
                 {admins.length ===
                 0 ? (
-                  <p>
-                    No hay administradores
-                    creados.
-                  </p>
+                  <div className="nova-admin-empty">
+                    <strong>
+                      Sin administradores
+                    </strong>
+
+                    <span>
+                      Todavía no hay administradores creados.
+                    </span>
+                  </div>
                 ) : (
                   admins.map(
                     (
@@ -1538,50 +2127,54 @@ export function AdminPage({
                         key={
                           admin.id
                         }
-                        style={{
-                          display:
-                            'flex',
-
-                          justifyContent:
-                            'space-between',
-
-                          alignItems:
-                            'center',
-
-                          gap:
-                            '12px',
-
-                          padding:
-                            '10px 0',
-
-                          borderBottom:
-                            '1px solid #e5e7eb',
-                        }}
+                        className="nova-admin-list-row"
                       >
-                        <div>
-                          <strong>
-                            {
-                              admin.username
-                            }
-                          </strong>
-
-                          <div>
-                            Página:{' '}
-                            {getSiteName(
-                              admin.siteId,
-                            )}
+                        <div className="nova-admin-list-row__main">
+                          <div className="nova-admin-list-row__avatar">
+                            {admin.username
+                              .slice(
+                                0,
+                                2,
+                              )
+                              .toUpperCase()}
                           </div>
 
-                          <div>
-                            Estado:{' '}
-                            {
-                              admin.status
-                            }
+                          <div className="nova-admin-list-row__content">
+                            <div className="nova-admin-list-row__title">
+                              <strong>
+                                {
+                                  admin.username
+                                }
+                              </strong>
+
+                              <EntityStatus
+                                status={
+                                  admin.status
+                                }
+                              />
+                            </div>
+
+                            <div className="nova-admin-list-row__meta">
+                              <span>
+                                Página:{' '}
+                                <strong>
+                                  {getSiteName(
+                                    admin.siteId,
+                                  )}
+                                </strong>
+                              </span>
+                            </div>
                           </div>
                         </div>
 
                         <button
                           type="button"
+                          className={
+                            admin.status ===
+                            'ACTIVE'
+                              ? 'nova-admin-secondary-button nova-admin-secondary-button--danger'
+                              : 'nova-admin-secondary-button'
+                          }
                           disabled={
                             managingUserId ===
                             admin.id
@@ -1605,62 +2198,69 @@ export function AdminPage({
                   )
                 )}
               </div>
-            </>
-          ) : null}
+            </article>
+          </section>
+        ) : null}
 
-          {user.role ===
-          'ADMIN' ? (
-            <div
-              style={{
-                marginTop:
-                  '20px',
+        {user.role ===
+        'ADMIN' ? (
+          <section className="nova-admin-management-grid nova-admin-management-grid--single">
+            <article className="nova-admin-panel">
+              <div className="nova-admin-panel__header">
+                <div>
+                  <span className="nova-admin-panel__icon">
+                    🎧
+                  </span>
 
-                padding:
-                  '16px',
+                  <div>
+                    <h2>
+                      Agentes
+                    </h2>
 
-                border:
-                  '1px solid #e5e7eb',
+                    <p>
+                      Gestiona el equipo que atenderá las conversaciones.
+                    </p>
+                  </div>
+                </div>
 
-                borderRadius:
-                  '12px',
-              }}
-            >
-              <h2>
-                Gestión de agentes
-              </h2>
+                <span className="nova-admin-panel__count">
+                  {
+                    allAgents.length
+                  }
+                </span>
+              </div>
 
               <form
+                className="nova-admin-form nova-admin-form--agent"
                 onSubmit={
                   handleCreateAgent
                 }
-                style={{
-                  display:
-                    'flex',
-
-                  gap:
-                    '8px',
-
-                  marginBottom:
-                    '16px',
-                }}
               >
-                <input
-                  type="text"
-                  value={
-                    newAgentUsername
-                  }
-                  placeholder="Nombre de usuario"
-                  onChange={(
-                    event,
-                  ) => {
-                    setNewAgentUsername(
-                      event.target.value,
-                    );
-                  }}
-                />
+                <div className="nova-admin-field">
+                  <label htmlFor="nova-agent-username">
+                    Nombre de usuario
+                  </label>
+
+                  <input
+                    id="nova-agent-username"
+                    type="text"
+                    value={
+                      newAgentUsername
+                    }
+                    placeholder="Ej. soporte_01"
+                    onChange={(
+                      event,
+                    ) => {
+                      setNewAgentUsername(
+                        event.target.value,
+                      );
+                    }}
+                  />
+                </div>
 
                 <button
                   type="submit"
+                  className="nova-admin-primary-button"
                   disabled={
                     creatingAgent
                   }
@@ -1672,70 +2272,75 @@ export function AdminPage({
               </form>
 
               {createdAgent ? (
-                <div
-                  style={{
-                    padding:
-                      '12px',
+                <div className="nova-admin-credentials">
+                  <div className="nova-admin-credentials__icon">
+                    ✓
+                  </div>
 
-                    marginBottom:
-                      '16px',
-
-                    border:
-                      '1px solid #e5e7eb',
-
-                    borderRadius:
-                      '8px',
-                  }}
-                >
-                  <strong>
-                    Agente creado
-                  </strong>
-
-                  <p>
-                    Usuario:{' '}
+                  <div className="nova-admin-credentials__content">
                     <strong>
-                      {
-                        createdAgent.username
-                      }
+                      Agente creado
                     </strong>
-                  </p>
 
-                  <p>
-                    Contraseña temporal:{' '}
-                    <strong>
-                      {
-                        createdAgent.password
-                      }
-                    </strong>
-                  </p>
+                    <span>
+                      Guarda estas credenciales antes de cerrar este aviso.
+                    </span>
 
-                  <p>
-                    Guarda esta contraseña
-                    antes de continuar.
-                  </p>
+                    <dl>
+                      <div>
+                        <dt>
+                          Usuario
+                        </dt>
+
+                        <dd>
+                          {
+                            createdAgent.username
+                          }
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt>
+                          Contraseña temporal
+                        </dt>
+
+                        <dd>
+                          {
+                            createdAgent.password
+                          }
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
 
                   <button
                     type="button"
+                    aria-label="Ocultar credenciales"
                     onClick={() => {
                       setCreatedAgent(
                         null,
                       );
                     }}
                   >
-                    Ocultar
+                    ×
                   </button>
                 </div>
               ) : null}
 
-              {allAgents.length ===
-              0 ? (
-                <p>
-                  No hay agentes
-                  creados.
-                </p>
-              ) : (
-                <div>
-                  {allAgents.map(
+              <div className="nova-admin-list">
+                {allAgents.length ===
+                0 ? (
+                  <div className="nova-admin-empty">
+                    <strong>
+                      Sin agentes
+                    </strong>
+
+                    <span>
+                      Crea el primer agente para comenzar a atender conversaciones.
+                    </span>
+                  </div>
+                ) : (
+                  allAgents.map(
                     (
                       agent,
                     ) => (
@@ -1743,43 +2348,49 @@ export function AdminPage({
                         key={
                           agent.id
                         }
-                        style={{
-                          display:
-                            'flex',
-
-                          alignItems:
-                            'center',
-
-                          justifyContent:
-                            'space-between',
-
-                          gap:
-                            '12px',
-
-                          padding:
-                            '10px 0',
-
-                          borderBottom:
-                            '1px solid #e5e7eb',
-                        }}
+                        className="nova-admin-list-row"
                       >
-                        <div>
-                          <strong>
-                            {
-                              agent.username
-                            }
-                          </strong>
+                        <div className="nova-admin-list-row__main">
+                          <div className="nova-admin-list-row__avatar">
+                            {agent.username
+                              .slice(
+                                0,
+                                2,
+                              )
+                              .toUpperCase()}
+                          </div>
 
-                          <div>
-                            Estado:{' '}
-                            {
-                              agent.status
-                            }
+                          <div className="nova-admin-list-row__content">
+                            <div className="nova-admin-list-row__title">
+                              <strong>
+                                {
+                                  agent.username
+                                }
+                              </strong>
+
+                              <EntityStatus
+                                status={
+                                  agent.status
+                                }
+                              />
+                            </div>
+
+                            <div className="nova-admin-list-row__meta">
+                              <span>
+                                Agente de soporte
+                              </span>
+                            </div>
                           </div>
                         </div>
 
                         <button
                           type="button"
+                          className={
+                            agent.status ===
+                            'ACTIVE'
+                              ? 'nova-admin-secondary-button nova-admin-secondary-button--danger'
+                              : 'nova-admin-secondary-button'
+                          }
                           disabled={
                             managingUserId ===
                             agent.id
@@ -1800,264 +2411,322 @@ export function AdminPage({
                         </button>
                       </div>
                     ),
-                  )}
-                </div>
-              )}
+                  )
+                )}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        <section className="nova-admin-conversation-section">
+          <div className="nova-admin-section-heading">
+            <div>
+              <h2>
+                Conversaciones
+              </h2>
+
+              <p>
+                Revisa el historial y asigna cada conversación al agente correspondiente.
+              </p>
             </div>
-          ) : null}
-
-          <div className="nova-admin-summary">
-            <span>
-              Agentes activos:{' '}
-              <strong>
-                {agents.length}
-              </strong>
-            </span>
 
             <span>
-              Conversaciones:{' '}
-              <strong>
-                {
-                  conversations.length
-                }
-              </strong>
+              {
+                conversations.length
+              }{' '}
+              total
             </span>
           </div>
 
-          <div className="nova-admin-layout">
-            <div className="nova-admin-conversations">
+          <div className="nova-admin-workspace">
+            <aside className="nova-admin-conversations">
+              <div className="nova-admin-conversations__header">
+                <strong>
+                  Bandeja
+                </strong>
+
+                <span>
+                  {
+                    conversations.length
+                  }
+                </span>
+              </div>
+
               {loading ? (
                 <div className="nova-admin-conversations__loading">
-                  Cargando
-                  conversaciones...
+                  Cargando conversaciones...
                 </div>
               ) : conversations.length ===
                 0 ? (
-                <div className="nova-admin-conversations__loading">
-                  No hay
-                  conversaciones.
+                <div className="nova-admin-empty">
+                  <strong>
+                    Sin conversaciones
+                  </strong>
+
+                  <span>
+                    Todavía no existen conversaciones en esta página.
+                  </span>
                 </div>
               ) : (
-                conversations.map(
-                  (
-                    conversation,
-                  ) => {
-                    const isSelected =
-                      activeConversation
-                        ?.id ===
-                      conversation.id;
+                <div className="nova-admin-conversation-list">
+                  {conversations.map(
+                    (
+                      conversation,
+                    ) => {
+                      const isSelected =
+                        activeConversation
+                          ?.id ===
+                        conversation.id;
 
-                    const conversationSiteId =
-                      (
-                        conversation as
-                          ConversationSummary & {
-                            siteId?:
-                              string | null;
+                      const conversationSiteId =
+                        (
+                          conversation as
+                            ConversationWithSite
+                        ).siteId ??
+                        null;
+
+                      const availableAgents =
+                        conversationSiteId
+                          ? agents.filter(
+                              (
+                                agent,
+                              ) =>
+                                agent.siteId ===
+                                conversationSiteId,
+                            )
+                          : agents;
+
+                      return (
+                        <article
+                          key={
+                            conversation.id
                           }
-                      ).siteId ??
-                      null;
-
-                    const availableAgents =
-                      conversationSiteId
-                        ? agents.filter(
-                            (
-                              agent,
-                            ) =>
-                              agent.siteId ===
-                              conversationSiteId,
-                          )
-                        : agents;
-
-                    return (
-                      <div
-                        key={
-                          conversation.id
-                        }
-                        className={
-                          isSelected
-                            ? 'nova-admin-conversation-card nova-admin-conversation-card--selected'
-                            : 'nova-admin-conversation-card'
-                        }
-                      >
-                        <div className="nova-admin-conversation-card__top">
-                          <strong>
-                            Visitante{' '}
-                            {conversation.visitor.id.slice(
-                              0,
-                              8,
-                            )}
-                          </strong>
-
-                          <span>
-                            {
-                              conversation.status
-                            }
-                          </span>
-                        </div>
-
-                        <p>
-                          Página:{' '}
-                          <strong>
-                            {getSiteName(
-                              conversationSiteId,
-                            )}
-                          </strong>
-                        </p>
-
-                        <p>
-                          Asignado:{' '}
-                          <strong>
-                            {conversation
-                              .assignedAgent
-                              ?.username ??
-                              'Sin asignar'}
-                          </strong>
-                        </p>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            void handleOpenConversation(
-                              conversation.id,
-                            );
-                          }}
+                          className={
+                            isSelected
+                              ? 'nova-admin-conversation-card nova-admin-conversation-card--selected'
+                              : 'nova-admin-conversation-card'
+                          }
                         >
-                          {isSelected
-                            ? 'Chat abierto'
-                            : 'Ver chat'}
-                        </button>
+                          <button
+                            type="button"
+                            className="nova-admin-conversation-card__open"
+                            onClick={() => {
+                              void handleOpenConversation(
+                                conversation.id,
+                              );
+                            }}
+                          >
+                            <div className="nova-admin-conversation-card__identity">
+                              <div className="nova-admin-conversation-card__avatar">
+                                {conversation.visitor.id
+                                  .slice(
+                                    0,
+                                    2,
+                                  )
+                                  .toUpperCase()}
+                              </div>
 
-                        {conversation.status !==
-                        'CLOSED' ? (
-                          <div className="nova-admin-conversation-actions">
-                            <select
-                              value={
-                                selectedAgents[
-                                  conversation
-                                    .id
-                                ] ??
-                                conversation
-                                  .assignedAgentId ??
-                                ''
-                              }
-                              onChange={(
-                                event,
-                              ) => {
-                                setSelectedAgents(
-                                  (
-                                    current,
-                                  ) => ({
-                                    ...current,
+                              <div>
+                                <strong>
+                                  Visitante{' '}
+                                  {conversation.visitor.id.slice(
+                                    0,
+                                    8,
+                                  )}
+                                </strong>
 
-                                    [conversation.id]:
-                                      event
-                                        .target
-                                        .value,
-                                  }),
-                                );
-                              }}
-                            >
-                              <option value="">
-                                Selecciona
-                                agente
-                              </option>
+                                <span>
+                                  {formatTime(
+                                    conversation.updatedAt,
+                                  )}
+                                </span>
+                              </div>
+                            </div>
 
-                              {availableAgents.map(
-                                (
-                                  agent,
-                                ) => (
-                                  <option
-                                    key={
-                                      agent.id
-                                    }
-                                    value={
-                                      agent.id
-                                    }
-                                  >
-                                    {
-                                      agent.username
-                                    }
-                                  </option>
-                                ),
+                            <div className="nova-admin-conversation-card__preview">
+                              {getLastMessage(
+                                conversation,
                               )}
-                            </select>
+                            </div>
 
-                            <button
-                              type="button"
-                              disabled={
-                                assigningConversationId ===
+                            <div className="nova-admin-conversation-card__details">
+                              <ConversationStatus
+                                status={
+                                  conversation.status
+                                }
+                              />
+
+                              <span>
+                                {getSiteName(
+                                  conversationSiteId,
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="nova-admin-conversation-card__agent">
+                              <span>
+                                Agente
+                              </span>
+
+                              <strong>
+                                {conversation
+                                  .assignedAgent
+                                  ?.username ??
+                                  'Sin asignar'}
+                              </strong>
+                            </div>
+                          </button>
+
+                          {conversation.status !==
+                          'CLOSED' ? (
+                            <div className="nova-admin-conversation-actions">
+                              <select
+                                aria-label="Agente"
+                                value={
+                                  selectedAgents[
+                                    conversation.id
+                                  ] ??
+                                  conversation
+                                    .assignedAgentId ??
+                                  ''
+                                }
+                                onChange={(
+                                  event,
+                                ) => {
+                                  setSelectedAgents(
+                                    (
+                                      current,
+                                    ) => ({
+                                      ...current,
+
+                                      [conversation.id]:
+                                        event.target.value,
+                                    }),
+                                  );
+                                }}
+                              >
+                                <option value="">
+                                  Selecciona agente
+                                </option>
+
+                                {availableAgents.map(
+                                  (
+                                    agent,
+                                  ) => (
+                                    <option
+                                      key={
+                                        agent.id
+                                      }
+                                      value={
+                                        agent.id
+                                      }
+                                    >
+                                      {
+                                        agent.username
+                                      }
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  assigningConversationId ===
+                                  conversation.id
+                                }
+                                onClick={() => {
+                                  void handleAssign(
+                                    conversation,
+                                  );
+                                }}
+                              >
+                                {assigningConversationId ===
                                 conversation.id
-                              }
-                              onClick={() => {
-                                void handleAssign(
-                                  conversation,
-                                );
-                              }}
-                            >
-                              {assigningConversationId ===
-                              conversation.id
-                                ? 'Asignando...'
-                                : conversation
-                                      .assignedAgentId
-                                  ? 'Reasignar'
-                                  : 'Asignar'}
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  },
-                )
+                                  ? 'Asignando...'
+                                  : conversation
+                                        .assignedAgentId
+                                    ? 'Reasignar'
+                                    : 'Asignar'}
+                              </button>
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    },
+                  )}
+                </div>
               )}
-            </div>
+            </aside>
 
             {loadingConversation ? (
               <div className="nova-admin-chat nova-admin-chat--placeholder">
-                Cargando
-                conversación...
+                <div className="nova-admin-chat-placeholder">
+                  <div className="nova-admin-chat-placeholder__icon">
+                    …
+                  </div>
+
+                  <h2>
+                    Cargando conversación
+                  </h2>
+
+                  <p>
+                    Espera un momento.
+                  </p>
+                </div>
               </div>
             ) : activeConversation ? (
               <div className="nova-admin-chat">
                 <header className="nova-admin-chat__header">
-                  <div>
-                    <h2>
-                      Visitante{' '}
-                      {activeConversation
-                        .visitor.id.slice(
+                  <div className="nova-admin-chat__person">
+                    <div className="nova-admin-chat__avatar">
+                      {activeConversation.visitor.id
+                        .slice(
+                          0,
+                          2,
+                        )
+                        .toUpperCase()}
+                    </div>
+
+                    <div>
+                      <h2>
+                        Visitante{' '}
+                        {activeConversation.visitor.id.slice(
                           0,
                           8,
                         )}
-                    </h2>
+                      </h2>
 
-                    <span>
-                      Estado:{' '}
-                      <strong>
-                        {
-                          activeConversation.status
-                        }
-                      </strong>
-                    </span>
+                      <div className="nova-admin-chat__meta">
+                        <ConversationStatus
+                          status={
+                            activeConversation.status
+                          }
+                        />
 
-                    <span>
-                      Agente:{' '}
-                      <strong>
-                        {activeConversation
-                          .assignedAgent
-                          ?.username ??
-                          'Sin asignar'}
-                      </strong>
-                    </span>
+                        <span>
+                          Agente:{' '}
+                          <strong>
+                            {activeConversation
+                              .assignedAgent
+                              ?.username ??
+                              'Sin asignar'}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
                   <button
                     type="button"
+                    className="nova-admin-chat__close"
                     onClick={() => {
                       setActiveConversation(
                         null,
                       );
                     }}
                   >
-                    Cerrar chat
+                    Cerrar
                   </button>
                 </header>
 
@@ -2066,9 +2735,7 @@ export function AdminPage({
                     .messages.length ===
                   0 ? (
                     <div className="nova-admin-chat__empty">
-                      Esta conversación
-                      todavía no tiene
-                      mensajes.
+                      Esta conversación todavía no tiene mensajes.
                     </div>
                   ) : (
                     activeConversation.messages.map(
@@ -2104,34 +2771,45 @@ export function AdminPage({
                           ) : null}
 
                           <small>
-                            {new Date(
+                            {formatDateTime(
                               message.createdAt,
-                            ).toLocaleString()}
+                            )}
                           </small>
                         </div>
                       ),
                     )
                   )}
                 </div>
+
+                <footer className="nova-admin-chat__footer">
+                  <span>
+                    Vista de supervisión
+                  </span>
+
+                  <strong>
+                    Los mensajes se responden desde la cuenta AGENT.
+                  </strong>
+                </footer>
               </div>
             ) : (
               <div className="nova-admin-chat nova-admin-chat--placeholder">
-                <div>
+                <div className="nova-admin-chat-placeholder">
+                  <div className="nova-admin-chat-placeholder__icon">
+                    💬
+                  </div>
+
                   <h2>
-                    Selecciona una
-                    conversación
+                    Selecciona una conversación
                   </h2>
 
                   <p>
-                    Pulsa “Ver chat”
-                    para visualizar
-                    los mensajes.
+                    Elige una conversación de la bandeja para revisar su historial.
                   </p>
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </section>
       </section>
 
       {notification ? (
@@ -2146,7 +2824,9 @@ export function AdminPage({
             </strong>
 
             <span>
-              {notification}
+              {
+                notification
+              }
             </span>
           </div>
 

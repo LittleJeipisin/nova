@@ -51,28 +51,51 @@ type InboxPageProps = {
 };
 
 type InboxNotification = {
-  type: 'success' | 'warning';
+  type:
+    | 'success'
+    | 'warning';
+
   title: string;
   message: string;
 };
 
 function sortConversations(
-  conversations: ConversationSummary[],
+  conversations:
+    ConversationSummary[],
 ) {
-  return [...conversations].sort(
-    (a, b) =>
-      new Date(b.updatedAt).getTime() -
-      new Date(a.updatedAt).getTime(),
+  return [
+    ...conversations,
+  ].sort(
+    (
+      a,
+      b,
+    ) =>
+      new Date(
+        b.updatedAt,
+      ).getTime() -
+      new Date(
+        a.updatedAt,
+      ).getTime(),
   );
 }
 
 function sortMessages(
-  messages: ChatMessage[],
+  messages:
+    ChatMessage[],
 ) {
-  return [...messages].sort(
-    (a, b) =>
-      new Date(a.createdAt).getTime() -
-      new Date(b.createdAt).getTime(),
+  return [
+    ...messages,
+  ].sort(
+    (
+      a,
+      b,
+    ) =>
+      new Date(
+        a.createdAt,
+      ).getTime() -
+      new Date(
+        b.createdAt,
+      ).getTime(),
   );
 }
 
@@ -82,12 +105,19 @@ function formatTime(
   return new Intl.DateTimeFormat(
     'es-CL',
     {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+
+      hour12:
+        false,
     },
   ).format(
-    new Date(value),
+    new Date(
+      value,
+    ),
   );
 }
 
@@ -97,14 +127,25 @@ function formatDateTime(
   return new Intl.DateTimeFormat(
     'es-CL',
     {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      day:
+        '2-digit',
+
+      month:
+        '2-digit',
+
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+
+      hour12:
+        false,
     },
   ).format(
-    new Date(value),
+    new Date(
+      value,
+    ),
   );
 }
 
@@ -174,7 +215,8 @@ export function InboxPage({
   onLogout,
 }: InboxPageProps) {
   const workspaceId =
-    user.workspaceId ?? '';
+    user.workspaceId ??
+    '';
 
   const [
     conversations,
@@ -204,13 +246,17 @@ export function InboxPage({
     loadingConversations,
     setLoadingConversations,
   ] =
-    useState(true);
+    useState(
+      true,
+    );
 
   const [
     loadingConversation,
     setLoadingConversation,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     claimingConversationId,
@@ -270,7 +316,9 @@ export function InboxPage({
     sendingMessage,
     setSendingMessage,
   ] =
-    useState(false);
+    useState(
+      false,
+    );
 
   const [
     conversationAction,
@@ -298,14 +346,6 @@ export function InboxPage({
       ConversationSummary[]
     >([]);
 
-  /*
-   * Cuando el propio AGENT pulsa
-   * "Tomar", recibirá también el
-   * conversation:removed de la room
-   * de conversaciones sin asignar.
-   *
-   * Debemos ignorar ese remove.
-   */
   const claimingConversationIdRef =
     useRef<
       string | null
@@ -316,23 +356,6 @@ export function InboxPage({
       number | null
     >(null);
 
-  /*
-   * Cuando OWNER / ADMIN asigna una
-   * conversación a este AGENT:
-   *
-   * 1. llega conversation:updated
-   *    por user:{agentId};
-   *
-   * 2. llega conversation:removed
-   *    por site:{siteId}:unassigned.
-   *
-   * Ese segundo evento NO significa
-   * que debamos quitar la conversación
-   * de "Mis conversaciones".
-   *
-   * Esta protección identifica
-   * exactamente ese caso.
-   */
   const assignedConversationProtectionRef =
     useRef<
       string | null
@@ -376,17 +399,21 @@ export function InboxPage({
   const resetComposer =
     useCallback(
       () => {
-        setComposerText('');
+        setComposerText(
+          '',
+        );
 
         setSelectedImage(
           null,
         );
 
         if (
-          imagePreviewUrlRef.current
+          imagePreviewUrlRef
+            .current
         ) {
           URL.revokeObjectURL(
-            imagePreviewUrlRef.current,
+            imagePreviewUrlRef
+              .current,
           );
 
           imagePreviewUrlRef.current =
@@ -559,14 +586,6 @@ export function InboxPage({
         conversation:
           ConversationSummary,
       ) => {
-        /*
-         * Actualizamos el ref de inmediato.
-         *
-         * Así cualquier evento Socket que
-         * llegue justo después encuentra
-         * la versión nueva sin esperar al
-         * siguiente render de React.
-         */
         const withoutCurrent =
           conversationsRef.current.filter(
             (
@@ -582,6 +601,14 @@ export function InboxPage({
             ...withoutCurrent,
           ]);
 
+        /*
+         * Ref + state se actualizan
+         * inmediatamente para evitar
+         * la carrera entre:
+         *
+         * conversation:updated
+         * conversation:removed
+         */
         conversationsRef.current =
           nextConversations;
 
@@ -608,10 +635,12 @@ export function InboxPage({
                 conversation.status,
 
               assignedAgentId:
-                conversation.assignedAgentId,
+                conversation
+                  .assignedAgentId,
 
               assignedAgent:
-                conversation.assignedAgent,
+                conversation
+                  .assignedAgent,
 
               updatedAt:
                 conversation.updatedAt,
@@ -900,10 +929,6 @@ export function InboxPage({
     const conversationId =
       activeConversation.id;
 
-    /*
-     * Activamos protección ANTES
-     * del PATCH.
-     */
     claimingConversationIdRef.current =
       conversationId;
 
@@ -964,7 +989,8 @@ export function InboxPage({
             ...current,
 
             status:
-              claimedConversation.status,
+              claimedConversation
+                .status,
 
             assignedAgentId:
               claimedConversation
@@ -986,7 +1012,8 @@ export function InboxPage({
       );
 
       showNotification({
-        type: 'success',
+        type:
+          'success',
 
         title:
           'Conversación tomada',
@@ -994,14 +1021,6 @@ export function InboxPage({
         message:
           'La conversación ahora está asignada a ti.',
       });
-
-      /*
-       * No limpiamos inmediatamente
-       * claimingConversationIdRef.
-       *
-       * El remove del room "unassigned"
-       * puede llegar justo después.
-       */
     } catch (
       err
     ) {
@@ -1093,7 +1112,8 @@ export function InboxPage({
 
   async function handleConversationStatus(
     status:
-      'OPEN' | 'PENDING',
+      | 'OPEN'
+      | 'PENDING',
   ) {
     if (
       !activeConversation ||
@@ -1301,7 +1321,9 @@ export function InboxPage({
     }
 
     const maxSizeBytes =
-      5 * 1024 * 1024;
+      5 *
+      1024 *
+      1024;
 
     if (
       file.size >
@@ -1330,10 +1352,12 @@ export function InboxPage({
       );
 
     if (
-      imagePreviewUrlRef.current
+      imagePreviewUrlRef
+        .current
     ) {
       URL.revokeObjectURL(
-        imagePreviewUrlRef.current,
+        imagePreviewUrlRef
+          .current,
       );
     }
 
@@ -1351,10 +1375,12 @@ export function InboxPage({
 
   function clearSelectedImage() {
     if (
-      imagePreviewUrlRef.current
+      imagePreviewUrlRef
+        .current
     ) {
       URL.revokeObjectURL(
-        imagePreviewUrlRef.current,
+        imagePreviewUrlRef
+          .current,
       );
 
       imagePreviewUrlRef.current =
@@ -1601,7 +1627,8 @@ export function InboxPage({
                 user.userId;
 
               const isNowAssignedToMe =
-                conversation.assignedAgentId ===
+                conversation
+                  .assignedAgentId ===
                 user.userId;
 
               const isMyOwnClaim =
@@ -1609,15 +1636,6 @@ export function InboxPage({
                   .current ===
                 conversation.id;
 
-              /*
-               * OWNER / ADMIN acaba de
-               * asignar esta conversación
-               * a este AGENT.
-               *
-               * Protegemos el remove que
-               * llegará desde la room
-               * "unassigned".
-               */
               if (
                 isNowAssignedToMe &&
                 !wasAlreadyAssignedToMe &&
@@ -1657,12 +1675,8 @@ export function InboxPage({
               }
 
               /*
-               * CASO 1:
-               * este AGENT pulsó "Tomar".
-               *
-               * El remove solamente
-               * significa que desaparece
-               * de "Sin asignar".
+               * El propio AGENT
+               * tomó esta conversación.
                */
               if (
                 claimingConversationIdRef
@@ -1677,16 +1691,13 @@ export function InboxPage({
               }
 
               /*
-               * CASO 2:
-               * OWNER / ADMIN acaba de
-               * asignar esta conversación
-               * a este AGENT.
+               * OWNER / ADMIN acaba
+               * de asignarla a este
+               * AGENT.
                *
-               * El remove viene de
-               * site:{siteId}:unassigned.
-               *
-               * No debemos eliminarla de
-               * "Mis conversaciones".
+               * Ignoramos solamente
+               * el remove de la room
+               * de sin asignar.
                */
               if (
                 assignedConversationProtectionRef
@@ -1709,11 +1720,6 @@ export function InboxPage({
                     conversationId,
                 );
 
-              /*
-               * Si seguía sin asignar,
-               * significa normalmente que
-               * otro agente la tomó.
-               */
               if (
                 removedConversation
                   ?.assignedAgentId ===
@@ -1732,12 +1738,11 @@ export function InboxPage({
               }
 
               /*
-               * Cualquier otro remove
-               * sí debe eliminarla.
+               * Otro remove sí es
+               * legítimo.
                *
-               * Ejemplo:
-               * ADMIN reasignó una
-               * conversación nuestra
+               * Por ejemplo:
+               * ADMIN la reasignó
                * a otro AGENT.
                */
               removeConversation(
@@ -1901,10 +1906,12 @@ export function InboxPage({
         }
 
         if (
-          imagePreviewUrlRef.current
+          imagePreviewUrlRef
+            .current
         ) {
           URL.revokeObjectURL(
-            imagePreviewUrlRef.current,
+            imagePreviewUrlRef
+              .current,
           );
 
           imagePreviewUrlRef.current =
@@ -1918,7 +1925,8 @@ export function InboxPage({
   useEffect(
     () => {
       const container =
-        messagesContainerRef.current;
+        messagesContainerRef
+          .current;
 
       if (
         !container
@@ -1963,7 +1971,8 @@ export function InboxPage({
       (
         conversation,
       ) =>
-        conversation.assignedAgentId ===
+        conversation
+          .assignedAgentId ===
         null,
     );
 
@@ -1972,7 +1981,8 @@ export function InboxPage({
       (
         conversation,
       ) =>
-        conversation.assignedAgentId !==
+        conversation
+          .assignedAgentId !==
         null,
     );
 
@@ -2006,10 +2016,13 @@ export function InboxPage({
         <div className="nova-inbox__conversation-top">
           <strong>
             Visitante{' '}
-            {conversation.visitor.id.slice(
-              0,
-              8,
-            )}
+            {conversation
+              .visitor
+              .id
+              .slice(
+                0,
+                8,
+              )}
           </strong>
 
           <span>
@@ -2039,7 +2052,7 @@ export function InboxPage({
   return (
     <main className="nova-inbox">
       <header className="nova-inbox__header">
-        <div className="nova-dashboard__brand">
+        <div className="nova-inbox__brand">
           <div className="nova-dashboard__logo">
             N
           </div>
@@ -2056,7 +2069,14 @@ export function InboxPage({
         </div>
 
         <div className="nova-inbox__header-right">
-          <span className="nova-inbox__socket">
+          <span
+            className={
+              socketStatus ===
+              'En línea'
+                ? 'nova-inbox__socket nova-inbox__socket--online'
+                : 'nova-inbox__socket'
+            }
+          >
             {socketStatus}
           </span>
 
@@ -2066,17 +2086,18 @@ export function InboxPage({
             </strong>
 
             <span>
-              {user.role}
+              AGENT
             </span>
           </div>
 
           <button
             type="button"
+            className="nova-inbox__logout-button"
             onClick={
               onLogout
             }
           >
-            Cerrar sesión
+            Salir
           </button>
         </div>
       </header>
@@ -2084,18 +2105,16 @@ export function InboxPage({
       <div className="nova-inbox__layout">
         <aside className="nova-inbox__sidebar">
           <div className="nova-inbox__sidebar-header">
-            <div>
-              <h1>
-                Conversaciones
-              </h1>
+            <h1>
+              Conversaciones
+            </h1>
 
-              <p>
-                {
-                  conversations.length
-                }{' '}
-                en tu bandeja
-              </p>
-            </div>
+            <p>
+              {
+                conversations.length
+              }{' '}
+              en tu bandeja
+            </p>
           </div>
 
           {loadingConversations ? (
@@ -2124,12 +2143,14 @@ export function InboxPage({
 
                   <span>
                     {
-                      unassignedConversations.length
+                      unassignedConversations
+                        .length
                     }
                   </span>
                 </div>
 
-                {unassignedConversations.length ===
+                {unassignedConversations
+                  .length ===
                 0 ? (
                   <div className="nova-inbox__empty">
                     No hay conversaciones
@@ -2157,16 +2178,18 @@ export function InboxPage({
 
                   <span>
                     {
-                      myConversations.length
+                      myConversations
+                        .length
                     }
                   </span>
                 </div>
 
-                {myConversations.length ===
+                {myConversations
+                  .length ===
                 0 ? (
                   <div className="nova-inbox__empty">
-                    Aún no has tomado
-                    conversaciones.
+                    Aún no tienes
+                    conversaciones asignadas.
                   </div>
                 ) : (
                   <div className="nova-inbox__conversation-list">
@@ -2193,14 +2216,14 @@ export function InboxPage({
               </div>
 
               <h2>
-                Selecciona una
-                conversación
+                Selecciona una conversación
               </h2>
 
               <p>
                 Elige una conversación
                 de la bandeja para ver
-                sus mensajes.
+                los mensajes y comenzar
+                a atender al visitante.
               </p>
             </div>
           ) : loadingConversation ? (
@@ -2210,23 +2233,39 @@ export function InboxPage({
           ) : activeConversation ? (
             <>
               <header className="nova-inbox__chat-header">
-                <div>
-                  <h2>
-                    Visitante{' '}
-                    {activeConversation.visitor.id.slice(
-                      0,
-                      8,
-                    )}
-                  </h2>
+                <div className="nova-inbox__chat-person">
+                  <div className="nova-inbox__chat-avatar">
+                    {activeConversation
+                      .visitor
+                      .id
+                      .slice(
+                        0,
+                        2,
+                      )
+                      .toUpperCase()}
+                  </div>
 
-                  <span>
-                    Última actividad:{' '}
-                    {formatDateTime(
-                      activeConversation
+                  <div className="nova-inbox__chat-person-text">
+                    <h2>
+                      Visitante{' '}
+                      {activeConversation
                         .visitor
-                        .lastSeenAt,
-                    )}
-                  </span>
+                        .id
+                        .slice(
+                          0,
+                          8,
+                        )}
+                    </h2>
+
+                    <span>
+                      Última actividad:{' '}
+                      {formatDateTime(
+                        activeConversation
+                          .visitor
+                          .lastSeenAt,
+                      )}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="nova-inbox__chat-header-actions">
@@ -2238,7 +2277,7 @@ export function InboxPage({
 
                   {activeConversation
                     .assignedAgentId ===
-                    null ? (
+                  null ? (
                     <button
                       type="button"
                       className="nova-inbox__claim-button"
@@ -2324,12 +2363,12 @@ export function InboxPage({
                 }
               >
                 {activeConversation
-                  .messages.length ===
+                  .messages
+                  .length ===
                 0 ? (
                   <div className="nova-inbox__empty">
-                    Esta conversación
-                    todavía no tiene
-                    mensajes.
+                    Esta conversación todavía
+                    no tiene mensajes.
                   </div>
                 ) : (
                   activeConversation.messages.map(
@@ -2393,112 +2432,43 @@ export function InboxPage({
                 </footer>
               ) : activeConversation.status ===
                 'CLOSED' ? (
-                <footer className="nova-inbox__composer-placeholder">
-                  Esta conversación está cerrada
-                  y ya no admite respuestas.
+                <footer className="nova-inbox__closed-state">
+                  <div className="nova-inbox__closed-state-icon">
+                    ✓
+                  </div>
+
+                  <div>
+                    <strong>
+                      Conversación cerrada
+                    </strong>
+
+                    <span>
+                      Esta conversación ya no
+                      admite respuestas.
+                    </span>
+                  </div>
                 </footer>
               ) : (
-                <footer
-                  className="nova-inbox__composer-placeholder"
-                  style={{
-                    display:
-                      'block',
-
-                    padding:
-                      '12px',
-                  }}
-                >
+                <footer className="nova-inbox__composer">
                   {selectedImage ? (
-                    <div
-                      style={{
-                        display:
-                          'flex',
-
-                        alignItems:
-                          'center',
-
-                        gap:
-                          '10px',
-
-                        marginBottom:
-                          '10px',
-
-                        padding:
-                          '8px',
-
-                        borderRadius:
-                          '10px',
-
-                        background:
-                          'rgba(255, 255, 255, 0.06)',
-                      }}
-                    >
+                    <div className="nova-inbox__image-preview">
                       {imagePreviewUrl ? (
                         <img
                           src={
                             imagePreviewUrl
                           }
                           alt="Vista previa de la imagen"
-                          style={{
-                            width:
-                              '56px',
-
-                            height:
-                              '56px',
-
-                            borderRadius:
-                              '8px',
-
-                            objectFit:
-                              'cover',
-
-                            flexShrink:
-                              0,
-                          }}
                         />
                       ) : null}
 
-                      <div
-                        style={{
-                          minWidth:
-                            0,
-
-                          flex:
-                            1,
-
-                          textAlign:
-                            'left',
-                        }}
-                      >
-                        <strong
-                          style={{
-                            display:
-                              'block',
-
-                            overflow:
-                              'hidden',
-
-                            textOverflow:
-                              'ellipsis',
-
-                            whiteSpace:
-                              'nowrap',
-                          }}
-                        >
+                      <div className="nova-inbox__image-preview-info">
+                        <strong>
                           {
                             selectedImage.name
                           }
                         </strong>
 
-                        <span
-                          style={{
-                            opacity:
-                              0.7,
-
-                            fontSize:
-                              '12px',
-                          }}
-                        >
+                        <span>
                           {(
                             selectedImage.size /
                             1024 /
@@ -2512,6 +2482,7 @@ export function InboxPage({
 
                       <button
                         type="button"
+                        className="nova-inbox__image-remove"
                         aria-label="Quitar imagen"
                         disabled={
                           sendingMessage
@@ -2519,19 +2490,6 @@ export function InboxPage({
                         onClick={
                           clearSelectedImage
                         }
-                        style={{
-                          border:
-                            0,
-
-                          background:
-                            'transparent',
-
-                          fontSize:
-                            '20px',
-
-                          cursor:
-                            'pointer',
-                        }}
                       >
                         ×
                       </button>
@@ -2539,19 +2497,10 @@ export function InboxPage({
                   ) : null}
 
                   <form
+                    className="nova-inbox__composer-form"
                     onSubmit={
                       handleComposerSubmit
                     }
-                    style={{
-                      display:
-                        'flex',
-
-                      alignItems:
-                        'flex-end',
-
-                      gap:
-                        '8px',
-                    }}
                   >
                     <input
                       ref={
@@ -2567,33 +2516,23 @@ export function InboxPage({
 
                     <button
                       type="button"
+                      className="nova-inbox__attachment-button"
                       aria-label="Adjuntar imagen"
                       title="Adjuntar imagen"
                       disabled={
                         sendingMessage
                       }
                       onClick={() => {
-                        fileInputRef.current
+                        fileInputRef
+                          .current
                           ?.click();
-                      }}
-                      style={{
-                        minWidth:
-                          '44px',
-
-                        minHeight:
-                          '44px',
-
-                        borderRadius:
-                          '10px',
-
-                        cursor:
-                          'pointer',
                       }}
                     >
                       📎
                     </button>
 
                     <textarea
+                      className="nova-inbox__composer-textarea"
                       value={
                         composerText
                       }
@@ -2613,32 +2552,11 @@ export function InboxPage({
                       onKeyDown={
                         handleComposerKeyDown
                       }
-                      style={{
-                        flex:
-                          1,
-
-                        minHeight:
-                          '44px',
-
-                        maxHeight:
-                          '120px',
-
-                        resize:
-                          'vertical',
-
-                        padding:
-                          '10px 12px',
-
-                        borderRadius:
-                          '10px',
-
-                        font:
-                          'inherit',
-                      }}
                     />
 
                     <button
                       type="submit"
+                      className="nova-inbox__send-button"
                       disabled={
                         sendingMessage ||
                         (
@@ -2646,21 +2564,6 @@ export function InboxPage({
                           !selectedImage
                         )
                       }
-                      style={{
-                        minHeight:
-                          '44px',
-
-                        padding:
-                          '0 16px',
-
-                        borderRadius:
-                          '10px',
-
-                        cursor:
-                          sendingMessage
-                            ? 'wait'
-                            : 'pointer',
-                      }}
                     >
                       {sendingMessage
                         ? 'Enviando...'
@@ -2668,23 +2571,10 @@ export function InboxPage({
                     </button>
                   </form>
 
-                  <div
-                    style={{
-                      marginTop:
-                        '6px',
-
-                      textAlign:
-                        'left',
-
-                      fontSize:
-                        '12px',
-
-                      opacity:
-                        0.65,
-                    }}
-                  >
-                    Enter para enviar · Shift +
-                    Enter para salto de línea
+                  <div className="nova-inbox__composer-hint">
+                    Enter para enviar ·
+                    Shift + Enter para salto
+                    de línea
                   </div>
                 </footer>
               )}
@@ -2695,6 +2585,12 @@ export function InboxPage({
 
       {notification ? (
         <div
+          className={
+            notification.type ===
+            'success'
+              ? 'nova-inbox__notification nova-inbox__notification--success'
+              : 'nova-inbox__notification nova-inbox__notification--warning'
+          }
           role={
             notification.type ===
             'warning'
@@ -2702,70 +2598,9 @@ export function InboxPage({
               : 'status'
           }
           aria-live="polite"
-          style={{
-            position:
-              'fixed',
-
-            right:
-              '24px',
-
-            bottom:
-              error
-                ? '88px'
-                : '24px',
-
-            zIndex:
-              1000,
-
-            width:
-              'min(360px, calc(100vw - 48px))',
-
-            padding:
-              '14px 16px',
-
-            borderRadius:
-              '12px',
-
-            background:
-              notification.type ===
-              'success'
-                ? '#163d2c'
-                : '#3d2f16',
-
-            color:
-              '#ffffff',
-
-            boxShadow:
-              '0 14px 36px rgba(0, 0, 0, 0.28)',
-
-            border:
-              '1px solid rgba(255, 255, 255, 0.12)',
-
-            display:
-              'flex',
-
-            alignItems:
-              'flex-start',
-
-            gap:
-              '12px',
-          }}
         >
-          <div
-            style={{
-              flex:
-                1,
-            }}
-          >
-            <strong
-              style={{
-                display:
-                  'block',
-
-                marginBottom:
-                  '4px',
-              }}
-            >
+          <div>
+            <strong>
               {notification.type ===
               'success'
                 ? '✓ '
@@ -2775,12 +2610,7 @@ export function InboxPage({
               }
             </strong>
 
-            <span
-              style={{
-                opacity:
-                  0.9,
-              }}
-            >
+            <span>
               {
                 notification.message
               }
@@ -2795,28 +2625,6 @@ export function InboxPage({
                 null,
               );
             }}
-            style={{
-              border:
-                0,
-
-              padding:
-                0,
-
-              background:
-                'transparent',
-
-              color:
-                'inherit',
-
-              fontSize:
-                '20px',
-
-              lineHeight:
-                1,
-
-              cursor:
-                'pointer',
-            }}
           >
             ×
           </button>
@@ -2828,10 +2636,13 @@ export function InboxPage({
           className="nova-inbox__error"
           role="alert"
         >
-          {error}
+          <span>
+            {error}
+          </span>
 
           <button
             type="button"
+            aria-label="Cerrar error"
             onClick={() => {
               setError(
                 null,
