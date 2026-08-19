@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import {
+  useState,
+} from 'react';
 
-import type { SyntheticEvent } from 'react';
+import type {
+  SyntheticEvent,
+} from 'react';
 
 import {
   clearAccessToken,
@@ -9,75 +13,135 @@ import {
   saveAccessToken,
 } from '../auth/auth';
 
-import type { AuthUser } from '../auth/auth';
+import type {
+  AuthUser,
+} from '../auth/auth';
 
 type LoginPageProps = {
-  onAuthenticated: (user: AuthUser) => void;
+  onAuthenticated: (
+    user: AuthUser,
+  ) => void;
 };
 
 const workspaceSlug =
-  new URLSearchParams(window.location.search)
+  new URLSearchParams(
+    window.location.search,
+  )
     .get('workspace')
     ?.trim() ?? '';
 
 export function LoginPage({
   onAuthenticated,
 }: LoginPageProps) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [
+    username,
+    setUsername,
+  ] =
+    useState('');
+
+  const [
+    password,
+    setPassword,
+  ] =
+    useState('');
+
+  const [
+    submitting,
+    setSubmitting,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string | null
+    >(
+      null,
+    );
 
   async function handleSubmit(
-    event: SyntheticEvent<HTMLFormElement>,
+    event:
+      SyntheticEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    if (!workspaceSlug) {
-      setError(
-        'No se pudo determinar el espacio de trabajo.',
-      );
-
-      return;
-    }
-
-    if (!username.trim() || !password) {
+    if (
+      !username.trim() ||
+      !password
+    ) {
       return;
     }
 
     try {
-      setSubmitting(true);
-      setError(null);
+      setSubmitting(
+        true,
+      );
 
-      const loginResult = await login({
-        username: username.trim(),
-        password,
-        workspaceSlug,
-      });
+      setError(
+        null,
+      );
 
-      saveAccessToken(loginResult.accessToken);
+      /*
+       * Si existe ?workspace=...
+       * se envía normalmente.
+       *
+       * Si no existe, login() no enviará
+       * workspaceSlug y el backend solo
+       * permitirá PLATFORM_ADMIN.
+       */
+      const loginResult =
+        await login({
+          username:
+            username.trim(),
+
+          password,
+
+          workspaceSlug:
+            workspaceSlug ||
+            undefined,
+        });
+
+      saveAccessToken(
+        loginResult.accessToken,
+      );
 
       try {
-        const user = await getMe(
-          loginResult.accessToken,
-        );
+        const user =
+          await getMe(
+            loginResult.accessToken,
+          );
 
-        onAuthenticated(user);
-      } catch (err) {
+        onAuthenticated(
+          user,
+        );
+      } catch (
+        err
+      ) {
         clearAccessToken();
 
         throw err;
       }
-    } catch (err) {
-      console.error(err);
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
 
       setError(
-        err instanceof Error
+        err instanceof
+          Error
           ? err.message
           : 'No se pudo iniciar sesión',
       );
     } finally {
-      setSubmitting(false);
+      setSubmitting(
+        false,
+      );
     }
   }
 
@@ -90,14 +154,20 @@ export function LoginPage({
           </div>
 
           <div>
-            <h1>Nova</h1>
+            <h1>
+              Nova
+            </h1>
 
-            <p>Panel de atención</p>
+            <p>
+              Panel de atención
+            </p>
           </div>
         </div>
 
         <div className="nova-login__heading">
-          <h2>Iniciar sesión</h2>
+          <h2>
+            Iniciar sesión
+          </h2>
 
           <p>
             Ingresa con tus credenciales.
@@ -106,19 +176,29 @@ export function LoginPage({
 
         <form
           className="nova-login__form"
-          onSubmit={handleSubmit}
+          onSubmit={
+            handleSubmit
+          }
         >
           <label>
             Usuario
 
             <input
               type="text"
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
+              value={
+                username
+              }
+              onChange={(
+                event,
+              ) => {
+                setUsername(
+                  event.target.value,
+                );
               }}
               placeholder="Usuario"
-              disabled={submitting}
+              disabled={
+                submitting
+              }
               autoComplete="username"
             />
           </label>
@@ -128,30 +208,39 @@ export function LoginPage({
 
             <input
               type="password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
+              value={
+                password
+              }
+              onChange={(
+                event,
+              ) => {
+                setPassword(
+                  event.target.value,
+                );
               }}
               placeholder="Tu contraseña"
-              disabled={submitting}
+              disabled={
+                submitting
+              }
               autoComplete="current-password"
             />
           </label>
 
-          {error && (
+          {error ? (
             <div
               className="nova-login__error"
               role="alert"
             >
-              {error}
+              {
+                error
+              }
             </div>
-          )}
+          ) : null}
 
           <button
             type="submit"
             disabled={
               submitting ||
-              !workspaceSlug ||
               !username.trim() ||
               !password
             }

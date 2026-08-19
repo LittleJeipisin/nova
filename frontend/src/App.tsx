@@ -3,10 +3,6 @@ import {
   useState,
 } from 'react';
 
-import {
-  ChangePasswordPage,
-} from './pages/ChangePasswordPage';
-
 import './App.css';
 
 import {
@@ -21,6 +17,14 @@ import type {
 } from './auth/auth';
 
 import {
+  AdminPage,
+} from './pages/AdminPage';
+
+import {
+  ChangePasswordPage,
+} from './pages/ChangePasswordPage';
+
+import {
   InboxPage,
 } from './pages/InboxPage';
 
@@ -29,101 +33,108 @@ import {
 } from './pages/LoginPage';
 
 import {
-  AdminPage,
-} from './pages/AdminPage';
+  PlatformAdminPage,
+} from './pages/PlatformAdminPage';
 
 function App() {
   const [
     user,
     setUser,
-  ] = useState<AuthUser | null>(
-    null,
-  );
+  ] =
+    useState<
+      AuthUser | null
+    >(
+      null,
+    );
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(
+      true,
+    );
 
   const [
     loggingOut,
     setLoggingOut,
-  ] = useState(false);
+  ] =
+    useState(
+      false,
+    );
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(
+    () => {
+      let cancelled =
+        false;
 
-    async function restoreSession() {
-      try {
-        /*
-         * Puede ocurrir que:
-         *
-         * 1. exista un Access Token válido;
-         * 2. exista uno vencido;
-         * 3. no exista Access Token,
-         *    pero sí la cookie HttpOnly
-         *    del Refresh Token.
-         *
-         * getValidAccessToken cubre los
-         * tres casos.
-         */
-        const storedAccessToken =
-          getStoredAccessToken();
+      async function restoreSession() {
+        try {
+          const storedAccessToken =
+            getStoredAccessToken();
 
-        const accessToken =
-          await getValidAccessToken(
-            storedAccessToken ??
-              undefined,
+          const accessToken =
+            await getValidAccessToken(
+              storedAccessToken ??
+                undefined,
+            );
+
+          const authenticatedUser =
+            await getMe(
+              accessToken,
+            );
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setUser(
+            authenticatedUser,
+          );
+        } catch (
+          error:
+            unknown
+        ) {
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          console.error(
+            'No se pudo restaurar la sesión:',
+            error,
           );
 
-        const authenticatedUser =
-          await getMe(
-            accessToken,
+          setUser(
+            null,
           );
-
-        if (cancelled) {
-          return;
-        }
-
-        setUser(
-          authenticatedUser,
-        );
-      } catch (error: unknown) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(
-          'No se pudo restaurar la sesión:',
-          error,
-        );
-
-        /*
-         * Si tampoco pudimos renovar
-         * mediante Refresh Token,
-         * mostramos el login.
-         */
-        setUser(
-          null,
-        );
-      } finally {
-        if (!cancelled) {
-          setLoading(
-            false,
-          );
+        } finally {
+          if (
+            !cancelled
+          ) {
+            setLoading(
+              false,
+            );
+          }
         }
       }
-    }
 
-    void restoreSession();
+      void restoreSession();
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      return () => {
+        cancelled =
+          true;
+      };
+    },
+    [],
+  );
 
   function handleAuthenticated(
-    authenticatedUser: AuthUser,
+    authenticatedUser:
+      AuthUser,
   ) {
     setUser(
       authenticatedUser,
@@ -131,7 +142,9 @@ function App() {
   }
 
   async function handleLogout() {
-    if (loggingOut) {
+    if (
+      loggingOut
+    ) {
       return;
     }
 
@@ -140,15 +153,11 @@ function App() {
     );
 
     try {
-      /*
-       * POST /auth/logout:
-       *
-       * - revoca RefreshSession;
-       * - elimina cookie HttpOnly;
-       * - elimina Access Token local.
-       */
       await logout();
-    } catch (error: unknown) {
+    } catch (
+      error:
+        unknown
+    ) {
       console.error(
         'Error cerrando sesión:',
         error,
@@ -164,7 +173,9 @@ function App() {
     }
   }
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
       <main className="nova-loading">
         Cargando Nova...
@@ -172,7 +183,9 @@ function App() {
     );
   }
 
-  if (!user) {
+  if (
+    !user
+  ) {
     return (
       <LoginPage
         onAuthenticated={
@@ -183,129 +196,79 @@ function App() {
   }
 
   if (
-  user.mustChangePassword
-) {
-  return (
-    <ChangePasswordPage
-      user={user}
-      onPasswordChanged={
-        handleAuthenticated
-      }
-      onLogout={
-        handleLogout
-      }
-    />
-  );
-}
-
-  if (user.role === 'AGENT') {
+    user.mustChangePassword
+  ) {
     return (
-      <InboxPage
-        user={user}
+      <ChangePasswordPage
+        user={
+          user
+        }
+        onPasswordChanged={
+          handleAuthenticated
+        }
         onLogout={
           handleLogout
         }
       />
     );
   }
+
   if (
-  user.role === 'OWNER' ||
-  user.role === 'ADMIN'
-) {
-  return (
-    <AdminPage
-      user={user}
-      onLogout={
-        handleLogout
-      }
-    />
-  );
-}
+    user.role ===
+    'PLATFORM_ADMIN'
+  ) {
+    return (
+      <PlatformAdminPage
+        user={
+          user
+        }
+        onLogout={
+          handleLogout
+        }
+        loggingOut={
+          loggingOut
+        }
+      />
+    );
+  }
+
+  if (
+    user.role ===
+    'AGENT'
+  ) {
+    return (
+      <InboxPage
+        user={
+          user
+        }
+        onLogout={
+          handleLogout
+        }
+      />
+    );
+  }
+
+  if (
+    user.role ===
+      'OWNER' ||
+    user.role ===
+      'ADMIN'
+  ) {
+    return (
+      <AdminPage
+        user={
+          user
+        }
+        onLogout={
+          handleLogout
+        }
+      />
+    );
+  }
 
   return (
-    <main className="nova-dashboard">
-      <header className="nova-dashboard__header">
-        <div className="nova-dashboard__brand">
-          <div className="nova-dashboard__logo">
-            N
-          </div>
-
-          <strong>
-            Nova
-          </strong>
-        </div>
-
-        <div className="nova-dashboard__user">
-          <div>
-            <strong>
-              {user.username}
-            </strong>
-
-            <span>
-              {user.role}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              void handleLogout();
-            }}
-            disabled={
-              loggingOut
-            }
-          >
-            {loggingOut
-              ? 'Cerrando...'
-              : 'Cerrar sesión'}
-          </button>
-        </div>
-      </header>
-
-      <section className="nova-dashboard__content">
-        <div className="nova-dashboard__welcome">
-          <h1>
-            Bienvenido a Nova
-          </h1>
-
-          <p>
-            Tu sesión está autenticada correctamente.
-          </p>
-
-          <dl>
-            <div>
-              <dt>
-                Usuario
-              </dt>
-
-              <dd>
-                {user.username}
-              </dd>
-            </div>
-
-            <div>
-              <dt>
-                Rol
-              </dt>
-
-              <dd>
-                {user.role}
-              </dd>
-            </div>
-
-            <div>
-              <dt>
-                Workspace
-              </dt>
-
-              <dd>
-                {user.workspaceId ??
-                  'Plataforma'}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </section>
+    <main className="nova-loading">
+      Rol no compatible.
     </main>
   );
 }

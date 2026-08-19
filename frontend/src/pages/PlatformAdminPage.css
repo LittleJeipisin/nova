@@ -1,0 +1,1043 @@
+.nova-platform,
+.nova-platform * {
+  box-sizing: border-box;
+}
+
+.nova-platform {
+  width: 100%;
+  min-height: 100vh;
+
+  background: #f4f7fb;
+  color: #0f172a;
+}
+
+.nova-platform__topbar {
+  width: 100%;
+  min-height: 76px;
+
+  position: sticky;
+  top: 0;
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 24px;
+
+  padding: 0 22px;
+
+  border-bottom: 1px solid #dfe5ee;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 1px 3px
+    rgba(15, 23, 42, 0.04);
+}
+
+.nova-platform__brand {
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+}
+
+.nova-platform__logo {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 13px;
+
+  background: #2563eb;
+  color: #ffffff;
+
+  font-size: 19px;
+  font-weight: 800;
+
+  box-shadow:
+    0 7px 18px
+    rgba(37, 99, 235, 0.22);
+}
+
+.nova-platform__brand > div:last-child {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.nova-platform__brand strong {
+  font-size: 15px;
+}
+
+.nova-platform__brand span {
+  color: #64748b;
+
+  font-size: 10px;
+}
+
+.nova-platform__user {
+  display: flex;
+  align-items: center;
+
+  gap: 14px;
+}
+
+.nova-platform__user > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+
+  gap: 2px;
+}
+
+.nova-platform__user strong {
+  font-size: 12px;
+}
+
+.nova-platform__user span {
+  color: #64748b;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.nova-platform__user button {
+  min-height: 38px;
+
+  padding: 0 13px;
+
+  border: 1px solid #dbe3ed;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #475569;
+
+  font-size: 11px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.nova-platform__user button:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.nova-platform__shell {
+  width: 100%;
+  max-width: 1500px;
+
+  margin: 0 auto;
+
+  padding: 32px 28px 48px;
+}
+
+.nova-platform__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+
+  margin-bottom: 24px;
+}
+
+.nova-platform__eyebrow {
+  display: block;
+
+  margin-bottom: 5px;
+
+  color: #2563eb;
+
+  font-size: 10px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.08em;
+}
+
+.nova-platform__heading h1 {
+  margin: 0;
+
+  font-size: 29px;
+  line-height: 1.15;
+
+  letter-spacing: -0.04em;
+}
+
+.nova-platform__heading p {
+  margin: 7px 0 0;
+
+  color: #64748b;
+
+  font-size: 12px;
+}
+
+.nova-platform__error {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  margin-bottom: 18px;
+  padding: 11px 13px;
+
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+
+  background: #fef2f2;
+  color: #991b1b;
+
+  font-size: 11px;
+}
+
+.nova-platform__error > span {
+  width: 20px;
+  height: 20px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #fee2e2;
+
+  font-weight: 800;
+}
+
+.nova-platform__stats {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+
+  gap: 14px;
+
+  margin-bottom: 20px;
+}
+
+.nova-platform__stats article {
+  min-height: 94px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  padding: 16px 18px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 3px 12px
+    rgba(15, 23, 42, 0.035);
+}
+
+.nova-platform__stats article > span {
+  color: #64748b;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.05em;
+}
+
+.nova-platform__stats strong {
+  margin-top: 4px;
+
+  font-size: 26px;
+  line-height: 1;
+
+  letter-spacing: -0.04em;
+}
+
+.nova-platform__stats small {
+  margin-top: 6px;
+
+  color: #94a3b8;
+
+  font-size: 9px;
+}
+
+.nova-platform__grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.15fr)
+    minmax(360px, 0.85fr);
+
+  gap: 18px;
+
+  align-items: start;
+}
+
+.nova-platform-panel {
+  overflow: hidden;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 5px 18px
+    rgba(15, 23, 42, 0.04);
+}
+
+.nova-platform-panel__header {
+  min-height: 78px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 16px;
+
+  padding: 17px 18px;
+
+  border-bottom: 1px solid #edf1f5;
+}
+
+.nova-platform-panel__header h2 {
+  margin: 0;
+
+  font-size: 15px;
+}
+
+.nova-platform-panel__header p {
+  margin: 4px 0 0;
+
+  color: #64748b;
+
+  font-size: 10px;
+}
+
+.nova-platform-panel__count {
+  min-width: 30px;
+  height: 30px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #eff6ff;
+  color: #2563eb;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.nova-platform-form {
+  padding: 16px 18px;
+
+  border-bottom: 1px solid #edf1f5;
+
+  background: #f8fafc;
+}
+
+.nova-platform-form label,
+.nova-platform-owner-form label {
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+
+  color: #334155;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.nova-platform-form__row {
+  display: flex;
+
+  gap: 8px;
+}
+
+.nova-platform-form input,
+.nova-platform-owner-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+
+  padding: 9px 11px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+
+  outline: none;
+
+  background: #ffffff;
+  color: #0f172a;
+
+  font-size: 11px;
+}
+
+.nova-platform-form input:focus,
+.nova-platform-owner-form input:focus {
+  border-color: #2563eb;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(37, 99, 235, 0.09);
+}
+
+.nova-platform-form button,
+.nova-platform-owner-form button {
+  flex-shrink: 0;
+
+  min-height: 42px;
+
+  padding: 0 14px;
+
+  border: 1px solid #2563eb;
+  border-radius: 9px;
+
+  background: #2563eb;
+  color: #ffffff;
+
+  font-size: 10px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.nova-platform-form button:hover:not(:disabled),
+.nova-platform-owner-form button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.nova-platform-form button:disabled,
+.nova-platform-owner-form button:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+.nova-platform-workspaces {
+  max-height: 570px;
+
+  overflow-y: auto;
+
+  padding: 9px;
+}
+
+.nova-platform-workspace {
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 7px;
+
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.nova-platform-workspace + .nova-platform-workspace {
+  margin-top: 3px;
+}
+
+.nova-platform-workspace--selected {
+  border-color: #bfdbfe;
+
+  background: #eff6ff;
+}
+
+.nova-platform-workspace__select {
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  padding: 7px;
+
+  border: 0;
+
+  background: transparent;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.nova-platform-workspace__avatar {
+  width: 39px;
+  height: 39px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #f1f5f9;
+  color: #475569;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nova-platform-workspace--selected
+.nova-platform-workspace__avatar {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.nova-platform-workspace__content {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.nova-platform-workspace__title {
+  display: flex;
+  align-items: center;
+
+  gap: 7px;
+}
+
+.nova-platform-workspace__title strong {
+  overflow: hidden;
+
+  font-size: 11px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nova-platform-workspace__slug,
+.nova-platform-workspace__meta {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #64748b;
+
+  font-size: 9px;
+}
+
+.nova-platform-workspace__slug {
+  color: #2563eb;
+
+  font-weight: 650;
+}
+
+.nova-platform-status {
+  display: inline-flex;
+  align-items: center;
+
+  min-height: 21px;
+
+  padding: 0 7px;
+
+  border-radius: 999px;
+
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.nova-platform-status--active {
+  background: #ecfdf5;
+  color: #15803d;
+}
+
+.nova-platform-status--inactive {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.nova-platform-workspace__action {
+  min-height: 32px;
+
+  padding: 0 10px;
+
+  border: 1px solid #dbe3ed;
+  border-radius: 8px;
+
+  background: #ffffff;
+  color: #475569;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.nova-platform-workspace__action--danger {
+  color: #b91c1c;
+}
+
+.nova-platform-workspace__action:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.nova-platform-selected {
+  display: flex;
+  align-items: center;
+
+  gap: 11px;
+
+  margin: 16px 18px 0;
+  padding: 13px;
+
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+
+  background: #eff6ff;
+}
+
+.nova-platform-selected__avatar {
+  width: 42px;
+  height: 42px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 11px;
+
+  background: #2563eb;
+  color: #ffffff;
+
+  font-weight: 800;
+}
+
+.nova-platform-selected > div:last-child {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.nova-platform-selected span,
+.nova-platform-selected small {
+  color: #64748b;
+
+  font-size: 8px;
+}
+
+.nova-platform-selected strong {
+  font-size: 11px;
+}
+
+.nova-platform-owner-form {
+  display: flex;
+  align-items: flex-end;
+
+  gap: 8px;
+
+  margin: 14px 18px;
+  padding: 14px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  background: #f8fafc;
+}
+
+.nova-platform-owner-form label {
+  flex: 1;
+}
+
+.nova-platform-credentials {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 10px;
+
+  margin: 0 18px 14px;
+  padding: 13px;
+
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+
+  background: #f0fdf4;
+}
+
+.nova-platform-credentials__icon {
+  width: 28px;
+  height: 28px;
+
+  flex-shrink: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #dcfce7;
+  color: #15803d;
+
+  font-weight: 800;
+}
+
+.nova-platform-credentials__content {
+  min-width: 0;
+
+  flex: 1;
+}
+
+.nova-platform-credentials__content > strong {
+  display: block;
+
+  color: #166534;
+
+  font-size: 11px;
+}
+
+.nova-platform-credentials__content > span {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #15803d;
+
+  font-size: 9px;
+}
+
+.nova-platform-credentials__values {
+  display: grid;
+
+  gap: 7px;
+
+  margin-top: 10px;
+}
+
+.nova-platform-credentials__values > div {
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+.nova-platform-credentials__values small {
+  color: #64748b;
+
+  font-size: 8px;
+}
+
+.nova-platform-credentials__values code {
+  overflow-x: auto;
+
+  padding: 7px 8px;
+
+  border: 1px solid #bbf7d0;
+  border-radius: 7px;
+
+  background: #ffffff;
+  color: #166534;
+
+  font-size: 9px;
+}
+
+.nova-platform-owner-list {
+  margin: 0 18px 18px;
+}
+
+.nova-platform-owner-list__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  margin-bottom: 8px;
+}
+
+.nova-platform-owner-list__heading strong {
+  font-size: 10px;
+}
+
+.nova-platform-owner-list__heading span {
+  min-width: 24px;
+  height: 24px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 8px;
+
+  background: #f1f5f9;
+  color: #64748b;
+
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.nova-platform-owner {
+  display: flex;
+  align-items: center;
+
+  gap: 9px;
+
+  padding: 10px;
+
+  border: 1px solid #edf1f5;
+  border-radius: 10px;
+}
+
+.nova-platform-owner + .nova-platform-owner {
+  margin-top: 6px;
+}
+
+.nova-platform-owner__avatar {
+  width: 31px;
+  height: 31px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: #eff6ff;
+  color: #2563eb;
+
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.nova-platform-owner > div:nth-child(2) {
+  min-width: 0;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.nova-platform-owner strong {
+  font-size: 10px;
+}
+
+.nova-platform-owner span:not(.nova-platform-status) {
+  color: #64748b;
+
+  font-size: 8px;
+}
+
+.nova-platform-owner-empty,
+.nova-platform-warning {
+  padding: 12px;
+
+  border: 1px dashed #dbe3ed;
+  border-radius: 10px;
+
+  color: #64748b;
+
+  font-size: 9px;
+
+  text-align: center;
+}
+
+.nova-platform-warning {
+  margin: 14px 18px;
+
+  border-color: #fde68a;
+
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.nova-platform-empty {
+  min-height: 220px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 24px;
+
+  text-align: center;
+}
+
+.nova-platform-empty > div {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin-bottom: 5px;
+
+  border-radius: 12px;
+
+  background: #eff6ff;
+  color: #2563eb;
+
+  font-weight: 800;
+}
+
+.nova-platform-empty strong {
+  font-size: 11px;
+}
+
+.nova-platform-empty span {
+  max-width: 260px;
+
+  color: #64748b;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.nova-platform-empty--owner {
+  min-height: 360px;
+}
+
+.nova-platform-toast {
+  position: fixed;
+
+  right: 22px;
+  bottom: 22px;
+
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+
+  padding: 11px 14px;
+
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+
+  background: #ffffff;
+  color: #166534;
+
+  font-size: 10px;
+  font-weight: 650;
+
+  box-shadow:
+    0 12px 30px
+    rgba(15, 23, 42, 0.13);
+}
+
+.nova-platform-toast span {
+  width: 21px;
+  height: 21px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #dcfce7;
+
+  font-size: 9px;
+}
+
+.nova-platform-loading {
+  width: 100%;
+  min-height: 100vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 10px;
+
+  background: #f4f7fb;
+  color: #64748b;
+
+  font-size: 11px;
+}
+
+.nova-platform-loading__logo {
+  width: 36px;
+  height: 36px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: #2563eb;
+  color: #ffffff;
+
+  font-weight: 800;
+}
+
+@media (max-width: 1050px) {
+  .nova-platform__grid {
+    grid-template-columns:
+      1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .nova-platform__stats {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .nova-platform__shell {
+    padding:
+      22px 12px 34px;
+  }
+
+  .nova-platform__topbar {
+    min-height: 66px;
+
+    padding: 0 13px;
+  }
+
+  .nova-platform__user > div {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .nova-platform-form__row,
+  .nova-platform-owner-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .nova-platform-form button,
+  .nova-platform-owner-form button {
+    width: 100%;
+  }
+
+  .nova-platform__stats {
+    gap: 8px;
+  }
+
+  .nova-platform-workspace {
+    align-items: flex-start;
+  }
+
+  .nova-platform-workspace__action {
+    margin-top: 8px;
+  }
+}
