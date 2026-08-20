@@ -16,9 +16,11 @@ type ConversationStatusValue = 'OPEN' | 'PENDING' | 'CLOSED';
 type ConversationWhereFilter = {
   workspaceId: string;
   siteId?: string;
+
   OR?: Array<{
     assignedAgentId: string | null;
   }>;
+
   status?: ConversationStatusValue;
 };
 
@@ -31,7 +33,9 @@ type ConversationRequester = {
 export class ConversationsService {
   constructor(
     private readonly prisma: PrismaService,
+
     private readonly realtimeService: RealtimeService,
+
     private readonly visitorsService: VisitorsService,
   ) {}
 
@@ -46,7 +50,9 @@ export class ConversationsService {
     const user = await this.prisma.user.findFirst({
       where: {
         id: requester.userId,
+
         workspaceId,
+
         status: 'ACTIVE',
       },
     });
@@ -62,7 +68,9 @@ export class ConversationsService {
     const site = await this.prisma.site.findFirst({
       where: {
         id: user.siteId,
+
         workspaceId,
+
         status: 'ACTIVE',
       },
     });
@@ -84,7 +92,9 @@ export class ConversationsService {
     const site = await this.prisma.site.findFirst({
       where: {
         id: siteId,
+
         workspaceId,
+
         status: 'ACTIVE',
       },
     });
@@ -129,12 +139,16 @@ export class ConversationsService {
     const existingConversation = await this.prisma.conversation.findFirst({
       where: {
         workspaceId: workspace.id,
+
         siteId: visitor.siteId,
+
         visitorId: visitor.id,
+
         status: {
           in: ['OPEN', 'PENDING'],
         },
       },
+
       orderBy: {
         createdAt: 'desc',
       },
@@ -157,8 +171,11 @@ export class ConversationsService {
     return this.prisma.conversation.create({
       data: {
         workspaceId: workspace.id,
+
         siteId: visitor.siteId,
+
         visitorId: visitor.id,
+
         status: 'OPEN',
       },
     });
@@ -198,8 +215,11 @@ export class ConversationsService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         workspaceId: workspace.id,
+
         siteId: visitor.siteId,
+
         visitorId: visitor.id,
+
         status: {
           in: ['OPEN', 'PENDING'],
         },
@@ -298,9 +318,13 @@ export class ConversationsService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -333,7 +357,9 @@ export class ConversationsService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         ...(requesterSiteId
           ? {
               siteId: requesterSiteId,
@@ -347,9 +373,13 @@ export class ConversationsService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -363,7 +393,9 @@ export class ConversationsService {
             senderUser: {
               select: {
                 id: true,
+
                 username: true,
+
                 role: true,
               },
             },
@@ -401,7 +433,9 @@ export class ConversationsService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         ...(requesterSiteId
           ? {
               siteId: requesterSiteId,
@@ -425,9 +459,13 @@ export class ConversationsService {
     const agent = await this.prisma.user.findFirst({
       where: {
         id: agentId,
+
         workspaceId,
+
         role: 'AGENT',
+
         status: 'ACTIVE',
+
         siteId: conversation.siteId,
       },
     });
@@ -447,6 +485,7 @@ export class ConversationsService {
 
       data: {
         assignedAgentId: agent.id,
+
         updatedAt: new Date(),
       },
 
@@ -456,9 +495,13 @@ export class ConversationsService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -473,14 +516,6 @@ export class ConversationsService {
       },
     });
 
-    /*
-     * IMPORTANTE:
-     * estas emisiones siguen usando rooms
-     * antiguas por Workspace.
-     *
-     * La separación de realtime por Site
-     * se hará en el siguiente bloque.
-     */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       workspaceId,
       updatedConversation,
@@ -535,9 +570,13 @@ export class ConversationsService {
     const claimed = await this.prisma.conversation.updateMany({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: agentSiteId,
+
         assignedAgentId: null,
+
         status: {
           in: ['OPEN', 'PENDING'],
         },
@@ -545,6 +584,7 @@ export class ConversationsService {
 
       data: {
         assignedAgentId: userId,
+
         updatedAt: new Date(),
       },
     });
@@ -553,7 +593,9 @@ export class ConversationsService {
       const conversation = await this.prisma.conversation.findFirst({
         where: {
           id: conversationId,
+
           workspaceId,
+
           siteId: agentSiteId,
         },
       });
@@ -585,8 +627,11 @@ export class ConversationsService {
     const updatedConversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: agentSiteId,
+
         assignedAgentId: userId,
       },
 
@@ -596,9 +641,13 @@ export class ConversationsService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -617,10 +666,6 @@ export class ConversationsService {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    /*
-     * Realtime todavía será migrado
-     * a rooms por Site en el siguiente bloque.
-     */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       workspaceId,
       updatedConversation,
@@ -642,6 +687,7 @@ export class ConversationsService {
   async close(workspaceId: string, conversationId: string, userId: string) {
     const agentSiteId = await this.getRequesterSiteId(workspaceId, {
       userId,
+
       role: 'AGENT',
     });
 
@@ -652,7 +698,9 @@ export class ConversationsService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: agentSiteId,
       },
     });
@@ -678,11 +726,19 @@ export class ConversationsService {
 
       data: {
         status: 'CLOSED',
+
         closedAt: new Date(),
+
         updatedAt: new Date(),
       },
     });
 
+    /*
+     * Aquí se notificará también
+     * al Visitor mediante:
+     *
+     * conversation:updated
+     */
     await this.emitConversationUpdated(updatedConversation.id);
 
     return updatedConversation;
@@ -704,6 +760,7 @@ export class ConversationsService {
 
     const agentSiteId = await this.getRequesterSiteId(workspaceId, {
       userId,
+
       role: 'AGENT',
     });
 
@@ -714,7 +771,9 @@ export class ConversationsService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: agentSiteId,
       },
     });
@@ -742,6 +801,7 @@ export class ConversationsService {
 
       data: {
         status: normalizedStatus,
+
         updatedAt: new Date(),
       },
     });
@@ -763,9 +823,13 @@ export class ConversationsService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -785,18 +849,31 @@ export class ConversationsService {
     }
 
     /*
-     * Realtime aún utiliza la infraestructura
-     * anterior por Workspace.
+     * IMPORTANTE:
      *
-     * No consideraremos terminado el aislamiento
-     * multi-Site hasta modificar RealtimeService
-     * y RealtimeGateway.
+     * La room conversation:{id}
+     * pertenece exclusivamente al Visitor.
+     *
+     * Con esto el widget recibe CLOSED
+     * inmediatamente cuando el agente
+     * finaliza la conversación.
+     */
+    this.realtimeService.emitConversationUpdatedToVisitor(
+      conversation.id,
+      conversation,
+    );
+
+    /*
+     * OWNER + ADMIN.
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       conversation.workspaceId,
       conversation,
     );
 
+    /*
+     * AGENT.
+     */
     if (conversation.assignedAgentId) {
       this.realtimeService.emitConversationUpdatedToUser(
         conversation.assignedAgentId,

@@ -17,18 +17,15 @@ import type {
   AuthUser,
 } from '../auth/auth';
 
+import {
+  getWorkspaceSlugFromPath,
+} from '../lib/workspace-route';
+
 type LoginPageProps = {
   onAuthenticated: (
     user: AuthUser,
   ) => void;
 };
-
-const workspaceSlug =
-  new URLSearchParams(
-    window.location.search,
-  )
-    .get('workspace')
-    ?.trim() ?? '';
 
 export function LoginPage({
   onAuthenticated,
@@ -63,6 +60,9 @@ export function LoginPage({
       null,
     );
 
+  const workspaceSlug =
+    getWorkspaceSlugFromPath();
+
   async function handleSubmit(
     event:
       SyntheticEvent<HTMLFormElement>,
@@ -86,12 +86,13 @@ export function LoginPage({
       );
 
       /*
-       * Si existe ?workspace=...
-       * se envía normalmente.
+       * /
+       *   → sin workspaceSlug
+       *   → exclusivamente PLATFORM_ADMIN
        *
-       * Si no existe, login() no enviará
-       * workspaceSlug y el backend solo
-       * permitirá PLATFORM_ADMIN.
+       * /alpha
+       *   → workspaceSlug = alpha
+       *   → usuarios del Workspace alpha
        */
       const loginResult =
         await login({
@@ -101,7 +102,7 @@ export function LoginPage({
           password,
 
           workspaceSlug:
-            workspaceSlug ||
+            workspaceSlug ??
             undefined,
         });
 
@@ -170,7 +171,9 @@ export function LoginPage({
           </h2>
 
           <p>
-            Ingresa con tus credenciales.
+            {workspaceSlug
+              ? `Acceso a ${workspaceSlug}`
+              : 'Acceso de plataforma'}
           </p>
         </div>
 

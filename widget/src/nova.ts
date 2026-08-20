@@ -1,21 +1,24 @@
 import { io } from 'socket.io-client';
 
-export const NOVA_API_URL = 'http://localhost:3000';
+export const NOVA_API_URL =
+  'http://localhost:3000';
 
-const workspaceParam = new URLSearchParams(
-  window.location.search,
-)
-  .get('workspace')
-  ?.trim();
+const workspaceParam =
+  new URLSearchParams(
+    window.location.search,
+  )
+    .get('workspace')
+    ?.trim();
 
 export const NOVA_WORKSPACE_SLUG =
   workspaceParam ?? '';
 
-const siteParam = new URLSearchParams(
-  window.location.search,
-)
-  .get('site')
-  ?.trim();
+const siteParam =
+  new URLSearchParams(
+    window.location.search,
+  )
+    .get('site')
+    ?.trim();
 
 export const NOVA_SITE_SLUG =
   siteParam ?? '';
@@ -28,7 +31,8 @@ export type NovaWidgetConfig = {
   title: string;
   subtitle: string;
   welcomeMessage: string;
-  position: NovaWidgetPosition;
+  position:
+    NovaWidgetPosition;
 
   site: {
     id: string;
@@ -39,86 +43,141 @@ export type NovaWidgetConfig = {
 
 export type NovaConversation = {
   id: string;
+
   status:
     | 'OPEN'
     | 'PENDING'
     | 'CLOSED';
+
   workspaceId: string;
-  siteId: string | null;
+
+  siteId:
+    string | null;
+
   visitorId: string;
-  assignedAgentId: string | null;
+
+  assignedAgentId:
+    string | null;
+
   createdAt: string;
   updatedAt: string;
-  closedAt: string | null;
+
+  closedAt:
+    string | null;
 };
 
 export type NovaMessage = {
   id: string;
-  conversationId: string;
+
+  conversationId:
+    string;
+
   senderType:
     | 'VISITOR'
     | 'USER';
-  senderUserId: string | null;
-  senderVisitorId: string | null;
+
+  senderUserId:
+    string | null;
+
+  senderVisitorId:
+    string | null;
+
   type:
     | 'TEXT'
     | 'IMAGE';
-  content: string | null;
-  mediaUrl: string | null;
-  createdAt: string;
+
+  content:
+    string | null;
+
+  mediaUrl:
+    string | null;
+
+  createdAt:
+    string;
 };
 
 type CreateVisitorResponse = {
   visitorId: string;
-  visitorToken: string;
+
+  visitorToken:
+    string;
 
   visitor: {
     id: string;
-    workspaceId: string;
-    siteId: string;
-    createdAt: string;
-    updatedAt: string;
-    lastSeenAt: string;
+
+    workspaceId:
+      string;
+
+    siteId:
+      string;
+
+    createdAt:
+      string;
+
+    updatedAt:
+      string;
+
+    lastSeenAt:
+      string;
   };
 };
 
 type ActiveConversationResponse = {
-  conversation: NovaConversation | null;
+  conversation:
+    NovaConversation | null;
 };
 
 export type NovaSession = {
-  visitorToken: string;
-  conversation: NovaConversation;
+  visitorToken:
+    string;
+
+  conversation:
+    NovaConversation;
 };
 
 type SocketHandlers = {
-  onJoined?: () => void;
+  onJoined?:
+    () => void;
 
   onMessage?: (
-    message: NovaMessage,
+    message:
+      NovaMessage,
   ) => void;
 
-  onDisconnect?: () => void;
+  onConversationUpdated?: (
+    conversation:
+      NovaConversation,
+  ) => void;
+
+  onDisconnect?:
+    () => void;
 
   onError?: (
-    message: string,
+    message:
+      string,
   ) => void;
 };
 
 let configPromise:
-  Promise<NovaWidgetConfig> | null = null;
+  Promise<NovaWidgetConfig> | null =
+    null;
 
 let visitorPromise:
-  Promise<string> | null = null;
+  Promise<string> | null =
+    null;
 
 let sessionPromise:
-  Promise<NovaSession> | null = null;
+  Promise<NovaSession> | null =
+    null;
 
 let restorePromise:
-  Promise<NovaSession | null> | null = null;
+  Promise<NovaSession | null> | null =
+    null;
 
 function getWorkspaceSlug() {
-  if (!NOVA_WORKSPACE_SLUG) {
+  if (
+    !NOVA_WORKSPACE_SLUG
+  ) {
     throw new Error(
       'Falta el parámetro ?workspace= en la URL',
     );
@@ -134,7 +193,9 @@ function getEncodedWorkspaceSlug() {
 }
 
 function getSiteSlug() {
-  if (!NOVA_SITE_SLUG) {
+  if (
+    !NOVA_SITE_SLUG
+  ) {
     throw new Error(
       'Falta el parámetro ?site= en la URL',
     );
@@ -176,11 +237,14 @@ async function loadNovaConfig() {
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/config?site=${siteSlug}`,
       {
-        method: 'GET',
+        method:
+          'GET',
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `Widget no disponible (${response.status})`,
     );
@@ -192,12 +256,15 @@ async function loadNovaConfig() {
 }
 
 export function getNovaConfig() {
-  if (!configPromise) {
+  if (
+    !configPromise
+  ) {
     configPromise =
       loadNovaConfig()
         .catch(
           (
-            error: unknown,
+            error:
+              unknown,
           ) => {
             configPromise =
               null;
@@ -221,7 +288,8 @@ async function createVisitor() {
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/visitors`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         headers: {
           'Content-Type':
@@ -230,12 +298,15 @@ async function createVisitor() {
 
         body:
           JSON.stringify({
-            site: siteSlug,
+            site:
+              siteSlug,
           }),
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo crear el Visitor (${response.status})`,
     );
@@ -258,11 +329,15 @@ async function getVisitorToken() {
   const storedToken =
     getStoredVisitorToken();
 
-  if (storedToken) {
+  if (
+    storedToken
+  ) {
     return storedToken;
   }
 
-  if (!visitorPromise) {
+  if (
+    !visitorPromise
+  ) {
     visitorPromise =
       createVisitor()
         .finally(
@@ -277,7 +352,8 @@ async function getVisitorToken() {
 }
 
 async function getConversation(
-  visitorToken: string,
+  visitorToken:
+    string,
 ) {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
@@ -285,7 +361,8 @@ async function getConversation(
   return fetch(
     `${NOVA_API_URL}/widget/${workspaceSlug}/conversations`,
     {
-      method: 'POST',
+      method:
+        'POST',
 
       headers: {
         Authorization:
@@ -296,7 +373,8 @@ async function getConversation(
 }
 
 async function getActiveConversation(
-  visitorToken: string,
+  visitorToken:
+    string,
 ) {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
@@ -304,7 +382,8 @@ async function getActiveConversation(
   return fetch(
     `${NOVA_API_URL}/widget/${workspaceSlug}/conversations/active`,
     {
-      method: 'GET',
+      method:
+        'GET',
 
       headers: {
         Authorization:
@@ -326,7 +405,9 @@ async function restoreSession():
   const visitorToken =
     getStoredVisitorToken();
 
-  if (!visitorToken) {
+  if (
+    !visitorToken
+  ) {
     return null;
   }
 
@@ -340,8 +421,6 @@ async function restoreSession():
    * de ser válido, lo olvidamos.
    *
    * Tampoco creamos Visitor nuevo aquí.
-   * Eso ocurrirá cuando realmente
-   * intente enviar un mensaje.
    */
   if (
     response.status ===
@@ -352,7 +431,9 @@ async function restoreSession():
     return null;
   }
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo recuperar la conversación (${response.status})`,
     );
@@ -363,24 +444,30 @@ async function restoreSession():
       await response.json()
     ) as ActiveConversationResponse;
 
-  if (!data.conversation) {
+  if (
+    !data.conversation
+  ) {
     return null;
   }
 
   return {
     visitorToken,
+
     conversation:
       data.conversation,
   };
 }
 
 export function restoreNovaSession() {
-  if (!restorePromise) {
+  if (
+    !restorePromise
+  ) {
     restorePromise =
       restoreSession()
         .catch(
           (
-            error: unknown,
+            error:
+              unknown,
           ) => {
             restorePromise =
               null;
@@ -399,7 +486,7 @@ export function restoreNovaSession() {
  * Visitor
  * Conversation
  *
- * Solamente debe usarse cuando el
+ * Solamente se usa cuando el
  * visitante realmente intenta enviar.
  */
 async function createSession():
@@ -427,7 +514,9 @@ async function createSession():
       );
   }
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo crear la conversación (${response.status})`,
     );
@@ -445,12 +534,15 @@ async function createSession():
 }
 
 export function getNovaSession() {
-  if (!sessionPromise) {
+  if (
+    !sessionPromise
+  ) {
     sessionPromise =
       createSession()
         .catch(
           (
-            error: unknown,
+            error:
+              unknown,
           ) => {
             sessionPromise =
               null;
@@ -463,9 +555,29 @@ export function getNovaSession() {
   return sessionPromise;
 }
 
+/*
+ * Prepara el widget para iniciar
+ * una nueva Conversation.
+ *
+ * NO borra el visitorToken.
+ *
+ * El mismo Visitor puede tener varias
+ * conversaciones históricas.
+ */
+export function resetNovaSessionCache() {
+  sessionPromise =
+    null;
+
+  restorePromise =
+    null;
+}
+
 export async function getNovaMessages(
-  visitorToken: string,
-  conversationId: string,
+  visitorToken:
+    string,
+
+  conversationId:
+    string,
 ) {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
@@ -474,7 +586,8 @@ export async function getNovaMessages(
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/conversations/${conversationId}/messages`,
       {
-        method: 'GET',
+        method:
+          'GET',
 
         headers: {
           Authorization:
@@ -483,7 +596,9 @@ export async function getNovaMessages(
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo cargar el historial (${response.status})`,
     );
@@ -495,9 +610,14 @@ export async function getNovaMessages(
 }
 
 export async function sendNovaTextMessage(
-  visitorToken: string,
-  conversationId: string,
-  content: string,
+  visitorToken:
+    string,
+
+  conversationId:
+    string,
+
+  content:
+    string,
 ) {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
@@ -506,7 +626,8 @@ export async function sendNovaTextMessage(
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/conversations/${conversationId}/messages`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         headers: {
           Authorization:
@@ -523,7 +644,9 @@ export async function sendNovaTextMessage(
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo enviar el mensaje (${response.status})`,
     );
@@ -535,10 +658,17 @@ export async function sendNovaTextMessage(
 }
 
 export async function sendNovaImageMessage(
-  visitorToken: string,
-  conversationId: string,
-  file: File,
-  content?: string,
+  visitorToken:
+    string,
+
+  conversationId:
+    string,
+
+  file:
+    File,
+
+  content?:
+    string,
 ) {
   const workspaceSlug =
     getEncodedWorkspaceSlug();
@@ -551,7 +681,9 @@ export async function sendNovaImageMessage(
     file,
   );
 
-  if (content?.trim()) {
+  if (
+    content?.trim()
+  ) {
     formData.append(
       'content',
       content.trim(),
@@ -562,7 +694,8 @@ export async function sendNovaImageMessage(
     await fetch(
       `${NOVA_API_URL}/widget/${workspaceSlug}/conversations/${conversationId}/images`,
       {
-        method: 'POST',
+        method:
+          'POST',
 
         headers: {
           Authorization:
@@ -574,7 +707,9 @@ export async function sendNovaImageMessage(
       },
     );
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     throw new Error(
       `No se pudo enviar la imagen (${response.status})`,
     );
@@ -586,13 +721,16 @@ export async function sendNovaImageMessage(
 }
 
 function getSocketErrorMessage(
-  error: unknown,
+  error:
+    unknown,
 ) {
   if (
     typeof error ===
       'object' &&
-    error !== null &&
-    'message' in error
+    error !==
+      null &&
+    'message' in
+      error
   ) {
     const message =
       error.message;
@@ -609,8 +747,12 @@ function getSocketErrorMessage(
 }
 
 export function connectNovaSocket(
-  visitorToken: string,
-  conversationId: string,
+  visitorToken:
+    string,
+
+  conversationId:
+    string,
+
   handlers:
     SocketHandlers = {},
 ) {
@@ -651,7 +793,8 @@ export function connectNovaSocket(
   socket.on(
     'conversation:joined',
     (
-      data: unknown,
+      data:
+        unknown,
     ) => {
       console.log(
         'Visitor unido a conversación:',
@@ -679,10 +822,37 @@ export function connectNovaSocket(
     },
   );
 
+  /*
+   * El Visitor recibe cambios de
+   * estado de su Conversation.
+   *
+   * Cuando el agente cierre:
+   *
+   * status = CLOSED
+   */
+  socket.on(
+    'conversation:updated',
+    (
+      conversation:
+        NovaConversation,
+    ) => {
+      console.log(
+        'Conversación actualizada:',
+        conversation,
+      );
+
+      handlers
+        .onConversationUpdated?.(
+          conversation,
+        );
+    },
+  );
+
   socket.on(
     'exception',
     (
-      error: unknown,
+      error:
+        unknown,
     ) => {
       const message =
         getSocketErrorMessage(
@@ -703,7 +873,8 @@ export function connectNovaSocket(
   socket.on(
     'connect_error',
     (
-      error: Error,
+      error:
+        Error,
     ) => {
       console.error(
         'Error de conexión Socket:',
@@ -719,7 +890,8 @@ export function connectNovaSocket(
   socket.on(
     'disconnect',
     () => {
-      handlers.onDisconnect?.();
+      handlers
+        .onDisconnect?.();
     },
   );
 

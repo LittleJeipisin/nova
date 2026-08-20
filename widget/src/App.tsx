@@ -18,6 +18,7 @@ import {
   getNovaMessages,
   getNovaSession,
   NOVA_API_URL,
+  resetNovaSessionCache,
   restoreNovaSession,
   sendNovaImageMessage,
   sendNovaTextMessage,
@@ -30,14 +31,20 @@ import type {
 } from './nova';
 
 function formatMessageTime(
-  createdAt: string,
+  createdAt:
+    string,
 ) {
   return new Intl.DateTimeFormat(
     'es-CL',
     {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
+      hour:
+        '2-digit',
+
+      minute:
+        '2-digit',
+
+      hour12:
+        false,
     },
   ).format(
     new Date(
@@ -47,7 +54,8 @@ function formatMessageTime(
 }
 
 function sortMessages(
-  messages: NovaMessage[],
+  messages:
+    NovaMessage[],
 ) {
   return [
     ...messages,
@@ -200,6 +208,17 @@ function App() {
       false,
     );
 
+  /*
+   * Evita que nuestro disconnect()
+   * intencional al cerrar la conversación
+   * cambie "Finalizada" por
+   * "Desconectado".
+   */
+  const conversationClosedRef =
+    useRef(
+      false,
+    );
+
   const addMessage =
     useCallback(
       (
@@ -298,12 +317,18 @@ function App() {
           return;
         }
 
+        conversationClosedRef.current =
+          false;
+
         socketRef.current =
           connectNovaSocket(
             novaSession.visitorToken,
             novaSession.conversation.id,
             {
               async onJoined() {
+                conversationClosedRef.current =
+                  false;
+
                 setConnectionStatus(
                   'En línea',
                 );
@@ -312,7 +337,9 @@ function App() {
                   const history =
                     await getNovaMessages(
                       novaSession.visitorToken,
-                      novaSession.conversation.id,
+                      novaSession
+                        .conversation
+                        .id,
                     );
 
                   mergeMessages(
@@ -342,7 +369,110 @@ function App() {
                 );
               },
 
+              onConversationUpdated(
+                conversation,
+              ) {
+                if (
+                  conversation.id !==
+                  novaSession
+                    .conversation
+                    .id
+                ) {
+                  return;
+                }
+
+                setSession(
+                  (
+                    currentSession,
+                  ) => {
+                    if (
+                      !currentSession ||
+                      currentSession
+                        .conversation
+                        .id !==
+                        conversation.id
+                    ) {
+                      return currentSession;
+                    }
+
+                    return {
+                      ...currentSession,
+
+                      conversation,
+                    };
+                  },
+                );
+
+                if (
+                  conversation.status !==
+                  'CLOSED'
+                ) {
+                  return;
+                }
+
+                /*
+                 * El agente cerró la
+                 * Conversation.
+                 */
+                conversationClosedRef.current =
+                  true;
+
+                setConnectionStatus(
+                  'Finalizada',
+                );
+
+                setError(
+                  null,
+                );
+
+                setInput(
+                  '',
+                );
+
+                setSending(
+                  false,
+                );
+
+                setSelectedImage(
+                  null,
+                );
+
+                setImagePreview(
+                  null,
+                );
+
+                if (
+                  fileInputRef.current
+                ) {
+                  fileInputRef.current.value =
+                    '';
+                }
+
+                /*
+                 * Ya no necesitamos mantener
+                 * Socket abierto para una
+                 * conversación cerrada.
+                 */
+                socketRef.current
+                  ?.disconnect();
+
+                socketRef.current =
+                  null;
+              },
+
               onDisconnect() {
+                /*
+                 * Si nosotros desconectamos
+                 * porque CLOSED, conservamos:
+                 *
+                 * Finalizada
+                 */
+                if (
+                  conversationClosedRef.current
+                ) {
+                  return;
+                }
+
                 setConnectionStatus(
                   'Desconectado',
                 );
@@ -463,6 +593,7 @@ function App() {
     [
       messages,
       isOpen,
+      session,
     ],
   );
 
@@ -575,12 +706,18 @@ function App() {
       if (
         !restoredSession
       ) {
+        conversationClosedRef.current =
+          false;
+
         setConnectionStatus(
           'Disponible',
         );
 
         return;
       }
+
+      conversationClosedRef.current =
+        false;
 
       setSession(
         restoredSession,
@@ -641,6 +778,68 @@ function App() {
     }
   }
 
+  /*
+   * El usuario decide iniciar otro
+   * contacto después del cierre.
+   *
+   * Conservamos Visitor.
+   * Olvidamos solamente Conversation.
+   *
+   * No creamos otra Conversation hasta
+   * que envíe el primer mensaje.
+   */
+  function handleStartNewConversation() {
+    socketRef.current
+      ?.disconnect();
+
+    socketRef.current =
+      null;
+
+    resetNovaSessionCache();
+
+    conversationClosedRef.current =
+      false;
+
+    setSession(
+      null,
+    );
+
+    setMessages(
+      [],
+    );
+
+    setInput(
+      '',
+    );
+
+    setError(
+      null,
+    );
+
+    setSending(
+      false,
+    );
+
+    setSelectedImage(
+      null,
+    );
+
+    setImagePreview(
+      null,
+    );
+
+    if (
+      fileInputRef.current
+    ) {
+      fileInputRef.current.value =
+        '';
+    }
+
+    setConnectionStatus(
+      'Disponible',
+    );
+  }
+
   function openFilePicker() {
     fileInputRef.current
       ?.click();
@@ -650,8 +849,18 @@ function App() {
     event:
       ChangeEvent<HTMLInputElement>,
   ) {
+    if (
+      session
+        ?.conversation
+        .status ===
+      'CLOSED'
+    ) {
+      return;
+    }
+
     const file =
-      event.target.files?.[0];
+      event.target
+        .files?.[0];
 
     if (
       !file
@@ -721,6 +930,21 @@ function App() {
   ) {
     event.preventDefault();
 
+    /*
+     * Segunda protección frontend.
+     *
+     * El backend además continúa
+     * bloqueando CLOSED.
+     */
+    if (
+      session
+        ?.conversation
+        .status ===
+      'CLOSED'
+    ) {
+      return;
+    }
+
     if (
       sending ||
       initializingSession
@@ -766,6 +990,9 @@ function App() {
         activeSession =
           await getNovaSession();
 
+        conversationClosedRef.current =
+          false;
+
         setSession(
           activeSession,
         );
@@ -784,7 +1011,9 @@ function App() {
         message =
           await sendNovaImageMessage(
             activeSession.visitorToken,
-            activeSession.conversation.id,
+            activeSession
+              .conversation
+              .id,
             selectedImage,
             content ||
               undefined,
@@ -795,7 +1024,9 @@ function App() {
         message =
           await sendNovaTextMessage(
             activeSession.visitorToken,
-            activeSession.conversation.id,
+            activeSession
+              .conversation
+              .id,
             content,
           );
       }
@@ -840,6 +1071,12 @@ function App() {
     return null;
   }
 
+  const conversationClosed =
+    session
+      ?.conversation
+      .status ===
+    'CLOSED';
+
   const positionClass =
     config.position ===
     'LEFT'
@@ -847,15 +1084,17 @@ function App() {
       : 'nova-widget-shell--right';
 
   const statusClass =
-    connectionStatus ===
-    'En línea'
-      ? 'nova-chat__status nova-chat__status--online'
+    conversationClosed
+      ? 'nova-chat__status nova-chat__status--closed'
       : connectionStatus ===
-            'Desconectado' ||
-          connectionStatus ===
-            'Error'
-        ? 'nova-chat__status nova-chat__status--offline'
-        : 'nova-chat__status';
+          'En línea'
+        ? 'nova-chat__status nova-chat__status--online'
+        : connectionStatus ===
+              'Desconectado' ||
+            connectionStatus ===
+              'Error'
+          ? 'nova-chat__status nova-chat__status--offline'
+          : 'nova-chat__status';
 
   const brandInitial =
     config.title
@@ -905,7 +1144,9 @@ function App() {
                 <span className="nova-chat__status-dot" />
 
                 {
-                  connectionStatus
+                  conversationClosed
+                    ? 'Finalizada'
+                    : connectionStatus
                 }
               </span>
 
@@ -1012,6 +1253,39 @@ function App() {
               ),
             )}
 
+            {conversationClosed ? (
+              <div
+                className="nova-chat__closed-notice"
+                role="status"
+              >
+                <div className="nova-chat__closed-notice-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M5 12.5l4 4L19 7"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+
+                <div className="nova-chat__closed-notice-content">
+                  <strong>
+                    Conversación finalizada
+                  </strong>
+
+                  <span>
+                    El equipo de soporte ha cerrado esta conversación.
+                  </span>
+                </div>
+              </div>
+            ) : null}
+
             {error ? (
               <div
                 className="nova-chat__error"
@@ -1048,163 +1322,187 @@ function App() {
             />
           </div>
 
-          {imagePreview ? (
-            <div className="nova-image-preview">
-              <div className="nova-image-preview__container">
-                <img
-                  src={
-                    imagePreview
-                  }
-                  alt="Vista previa"
-                  className="nova-image-preview__image"
-                />
-
-                <button
-                  type="button"
-                  className="nova-image-preview__remove"
-                  onClick={
-                    clearSelectedImage
-                  }
-                  aria-label="Quitar imagen"
-                  title="Quitar imagen"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="nova-image-preview__info">
-                <strong>
-                  Imagen seleccionada
-                </strong>
-
-                <span>
-                  {
-                    selectedImage?.name
-                  }
-                </span>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="nova-chat__composer-area">
-            <form
-              className="nova-chat__composer"
-              onSubmit={
-                handleSubmit
-              }
-            >
-              <input
-                ref={
-                  fileInputRef
-                }
-                className="nova-chat__file-input"
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={
-                  handleImageSelected
-                }
-              />
-
+          {conversationClosed ? (
+            <div className="nova-chat__closed-area">
               <button
                 type="button"
-                className="nova-chat__attach"
+                className="nova-chat__new-conversation"
                 onClick={
-                  openFilePicker
+                  handleStartNewConversation
                 }
-                disabled={
-                  sending ||
-                  initializingSession
-                }
-                title="Adjuntar imagen"
-                aria-label="Adjuntar imagen"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M8.5 12.5l5.8-5.8a3 3 0 114.2 4.2l-7.9 7.9a5 5 0 01-7.1-7.1l8.4-8.4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                Iniciar nueva conversación
               </button>
 
-              <div className="nova-chat__input-wrap">
-                <input
-                  type="text"
-                  value={
-                    input
-                  }
-                  onChange={(
-                    event,
-                  ) => {
-                    setInput(
-                      event.target.value,
-                    );
-                  }}
-                  placeholder={
-                    selectedImage
-                      ? 'Añade un mensaje...'
-                      : 'Escribe un mensaje...'
-                  }
-                  disabled={
-                    sending ||
-                    initializingSession
-                  }
-                  aria-label="Mensaje"
-                />
+              <div className="nova-chat__powered">
+                Atención mediante
+
+                <strong>
+                  Nova
+                </strong>
               </div>
-
-              <button
-                type="submit"
-                className="nova-chat__send"
-                disabled={
-                  sending ||
-                  initializingSession ||
-                  (
-                    !input.trim() &&
-                    !selectedImage
-                  )
-                }
-              >
-                {sending ? (
-                  <span className="nova-chat__sending">
-                    …
-                  </span>
-                ) : (
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M5 12h13M13 6l6 6-6 6"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                )}
-
-                <span className="nova-chat__send-label">
-                  Enviar
-                </span>
-              </button>
-            </form>
-
-            <div className="nova-chat__powered">
-              Atención mediante
-
-              <strong>
-                Nova
-              </strong>
             </div>
-          </div>
+          ) : (
+            <>
+              {imagePreview ? (
+                <div className="nova-image-preview">
+                  <div className="nova-image-preview__container">
+                    <img
+                      src={
+                        imagePreview
+                      }
+                      alt="Vista previa"
+                      className="nova-image-preview__image"
+                    />
+
+                    <button
+                      type="button"
+                      className="nova-image-preview__remove"
+                      onClick={
+                        clearSelectedImage
+                      }
+                      aria-label="Quitar imagen"
+                      title="Quitar imagen"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className="nova-image-preview__info">
+                    <strong>
+                      Imagen seleccionada
+                    </strong>
+
+                    <span>
+                      {
+                        selectedImage?.name
+                      }
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="nova-chat__composer-area">
+                <form
+                  className="nova-chat__composer"
+                  onSubmit={
+                    handleSubmit
+                  }
+                >
+                  <input
+                    ref={
+                      fileInputRef
+                    }
+                    className="nova-chat__file-input"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={
+                      handleImageSelected
+                    }
+                  />
+
+                  <button
+                    type="button"
+                    className="nova-chat__attach"
+                    onClick={
+                      openFilePicker
+                    }
+                    disabled={
+                      sending ||
+                      initializingSession
+                    }
+                    title="Adjuntar imagen"
+                    aria-label="Adjuntar imagen"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M8.5 12.5l5.8-5.8a3 3 0 114.2 4.2l-7.9 7.9a5 5 0 01-7.1-7.1l8.4-8.4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.9"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+
+                  <div className="nova-chat__input-wrap">
+                    <input
+                      type="text"
+                      value={
+                        input
+                      }
+                      onChange={(
+                        event,
+                      ) => {
+                        setInput(
+                          event.target.value,
+                        );
+                      }}
+                      placeholder={
+                        selectedImage
+                          ? 'Añade un mensaje...'
+                          : 'Escribe un mensaje...'
+                      }
+                      disabled={
+                        sending ||
+                        initializingSession
+                      }
+                      aria-label="Mensaje"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="nova-chat__send"
+                    disabled={
+                      sending ||
+                      initializingSession ||
+                      (
+                        !input.trim() &&
+                        !selectedImage
+                      )
+                    }
+                  >
+                    {sending ? (
+                      <span className="nova-chat__sending">
+                        …
+                      </span>
+                    ) : (
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M5 12h13M13 6l6 6-6 6"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
+
+                    <span className="nova-chat__send-label">
+                      Enviar
+                    </span>
+                  </button>
+                </form>
+
+                <div className="nova-chat__powered">
+                  Atención mediante
+
+                  <strong>
+                    Nova
+                  </strong>
+                </div>
+              </div>
+            </>
+          )}
         </section>
       ) : (
         <button

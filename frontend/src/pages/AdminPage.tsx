@@ -4,6 +4,10 @@ import {
   useState,
 } from 'react';
 
+import {
+  SiteIntegrationButton,
+} from '../components/SiteIntegrationButton';
+
 import type {
   SyntheticEvent,
 } from 'react';
@@ -1899,32 +1903,46 @@ export function AdminPage({
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          className={
-                            site.status ===
-                            'ACTIVE'
-                              ? 'nova-admin-secondary-button nova-admin-secondary-button--danger'
-                              : 'nova-admin-secondary-button'
-                          }
-                          disabled={
-                            managingSiteId ===
-                            site.id
-                          }
-                          onClick={() => {
-                            void handleSiteStatus(
-                              site,
-                            );
-                          }}
-                        >
-                          {managingSiteId ===
-                          site.id
-                            ? 'Procesando...'
-                            : site.status ===
-                                'ACTIVE'
-                              ? 'Desactivar'
-                              : 'Reactivar'}
-                        </button>
+                        <div className="nova-admin-list-row__actions">
+<SiteIntegrationButton
+  siteName={
+    site.name
+  }
+  siteSlug={
+    site.slug
+  }
+  siteStatus={
+    site.status
+  }
+/>
+
+  <button
+    type="button"
+    className={
+      site.status ===
+      'ACTIVE'
+        ? 'nova-admin-secondary-button nova-admin-secondary-button--danger'
+        : 'nova-admin-secondary-button'
+    }
+    disabled={
+      managingSiteId ===
+      site.id
+    }
+    onClick={() => {
+      void handleSiteStatus(
+        site,
+      );
+    }}
+  >
+    {managingSiteId ===
+    site.id
+      ? 'Procesando...'
+      : site.status ===
+          'ACTIVE'
+        ? 'Desactivar'
+        : 'Reactivar'}
+  </button>
+</div>
                       </div>
                     ),
                   )

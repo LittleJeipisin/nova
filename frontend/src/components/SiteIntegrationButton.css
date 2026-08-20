@@ -1,0 +1,543 @@
+.nova-admin-list-row__actions {
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+
+  gap: 8px;
+}
+
+.nova-site-integration-button {
+  min-height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: 6px;
+
+  padding: 0 11px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+
+  background: #eff6ff;
+  color: #1d4ed8;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.nova-site-integration-button:hover {
+  border-color: #93c5fd;
+
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.nova-site-integration-button > span {
+  font-family:
+    Consolas,
+    Monaco,
+    monospace;
+
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.nova-site-integration-overlay {
+  position: fixed;
+  inset: 0;
+
+  z-index: 250;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+
+  background:
+    rgba(
+      15,
+      23,
+      42,
+      0.55
+    );
+
+  backdrop-filter:
+    blur(3px);
+}
+
+.nova-site-integration-modal {
+  width: 100%;
+  max-width: 650px;
+
+  max-height: calc(
+    100vh - 48px
+  );
+
+  overflow: auto;
+
+  border: 1px solid #dbe3ed;
+  border-radius: 18px;
+
+  background: #ffffff;
+  color: #0f172a;
+
+  box-shadow:
+    0 24px 70px
+    rgba(
+      15,
+      23,
+      42,
+      0.25
+    );
+}
+
+.nova-site-integration-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  padding: 21px 22px 18px;
+
+  border-bottom:
+    1px solid #edf1f5;
+}
+
+.nova-site-integration-modal__eyebrow {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #2563eb;
+
+  font-size: 9px;
+  font-weight: 800;
+
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nova-site-integration-modal__header h2 {
+  margin: 0;
+
+  color: #0f172a;
+
+  font-size: 20px;
+  line-height: 1.2;
+
+  letter-spacing: -0.03em;
+}
+
+.nova-site-integration-modal__header p {
+  margin: 5px 0 0;
+
+  color: #64748b;
+
+  font-size: 10px;
+}
+
+.nova-site-integration-modal__close {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+
+  background: #ffffff;
+  color: #64748b;
+
+  font-size: 20px;
+  line-height: 1;
+
+  cursor: pointer;
+}
+
+.nova-site-integration-modal__close:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.nova-site-integration-modal__body {
+  padding: 20px 22px;
+}
+
+.nova-site-integration-summary {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(
+        0,
+        1fr
+      )
+    );
+
+  gap: 9px;
+
+  margin-bottom: 18px;
+}
+
+.nova-site-integration-summary > div {
+  min-width: 0;
+
+  padding: 11px 12px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+
+  background: #f8fafc;
+}
+
+.nova-site-integration-summary span {
+  display: block;
+
+  margin-bottom: 4px;
+
+  color: #64748b;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nova-site-integration-summary strong {
+  display: block;
+
+  overflow: hidden;
+
+  color: #0f172a;
+
+  font-size: 10px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nova-site-integration-summary__status--active {
+  color: #15803d !important;
+}
+
+.nova-site-integration-summary__status--inactive {
+  color: #b45309 !important;
+}
+
+.nova-site-integration-instructions {
+  margin-bottom: 10px;
+}
+
+.nova-site-integration-instructions > strong {
+  display: block;
+
+  margin-bottom: 4px;
+
+  font-size: 11px;
+}
+
+.nova-site-integration-instructions p {
+  margin: 0;
+
+  color: #64748b;
+
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.nova-site-integration-instructions code {
+  padding: 1px 4px;
+
+  border-radius: 4px;
+
+  background: #f1f5f9;
+  color: #334155;
+
+  font-size: 9px;
+}
+
+.nova-site-integration-code {
+  overflow: hidden;
+
+  border: 1px solid #dbe3ed;
+  border-radius: 11px;
+
+  background: #0f172a;
+}
+
+.nova-site-integration-code__header {
+  min-height: 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding: 0 10px 0 13px;
+
+  border-bottom:
+    1px solid #273449;
+
+  background: #172033;
+}
+
+.nova-site-integration-code__header > span {
+  color: #94a3b8;
+
+  font-size: 8px;
+  font-weight: 750;
+
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nova-site-integration-code__header button {
+  min-height: 27px;
+
+  padding: 0 9px;
+
+  border: 1px solid #334155;
+  border-radius: 7px;
+
+  background: #1e293b;
+  color: #e2e8f0;
+
+  font-size: 8px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.nova-site-integration-code__header button:hover:not(:disabled) {
+  background: #334155;
+}
+
+.nova-site-integration-code__header button:disabled {
+  opacity: 0.45;
+
+  cursor: not-allowed;
+}
+
+.nova-site-integration-code pre {
+  overflow-x: auto;
+
+  margin: 0;
+  padding: 17px;
+
+  background: #0f172a;
+}
+
+.nova-site-integration-code pre code {
+  color: #dbeafe;
+
+  font-family:
+    Consolas,
+    Monaco,
+    "Courier New",
+    monospace;
+
+  font-size: 10px;
+  line-height: 1.7;
+
+  white-space: pre;
+}
+
+.nova-site-integration-help {
+  display: flex;
+  align-items: flex-start;
+
+  gap: 9px;
+
+  margin-top: 14px;
+  padding: 11px 12px;
+
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+
+  background: #eff6ff;
+}
+
+.nova-site-integration-help__icon {
+  width: 22px;
+  height: 22px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #dbeafe;
+  color: #1d4ed8;
+
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.nova-site-integration-help > div:last-child {
+  display: flex;
+  flex-direction: column;
+
+  gap: 2px;
+}
+
+.nova-site-integration-help strong {
+  color: #1e40af;
+
+  font-size: 9px;
+}
+
+.nova-site-integration-help span {
+  color: #475569;
+
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.nova-site-integration-warning {
+  margin-bottom: 13px;
+  padding: 10px 11px;
+
+  border: 1px solid #fde68a;
+  border-radius: 9px;
+
+  background: #fffbeb;
+  color: #92400e;
+
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.nova-site-integration-error {
+  margin-top: 10px;
+  padding: 9px 10px;
+
+  border: 1px solid #fecaca;
+  border-radius: 9px;
+
+  background: #fef2f2;
+  color: #991b1b;
+
+  font-size: 9px;
+}
+
+.nova-site-integration-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 8px;
+
+  padding: 14px 22px;
+
+  border-top:
+    1px solid #edf1f5;
+
+  background: #f8fafc;
+}
+
+.nova-site-integration-modal__cancel,
+.nova-site-integration-modal__copy {
+  min-height: 37px;
+
+  padding: 0 13px;
+
+  border-radius: 9px;
+
+  font-size: 9px;
+  font-weight: 700;
+
+  cursor: pointer;
+}
+
+.nova-site-integration-modal__cancel {
+  border: 1px solid #dbe3ed;
+
+  background: #ffffff;
+  color: #475569;
+}
+
+.nova-site-integration-modal__copy {
+  border: 1px solid #2563eb;
+
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.nova-site-integration-modal__copy:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.nova-site-integration-modal__copy:disabled {
+  opacity: 0.45;
+
+  cursor: not-allowed;
+}
+
+@media (
+  max-width: 720px
+) {
+  .nova-admin-list-row__actions {
+    width: 100%;
+
+    justify-content: flex-end;
+  }
+
+  .nova-site-integration-overlay {
+    padding: 12px;
+  }
+
+  .nova-site-integration-modal {
+    max-height:
+      calc(
+        100dvh - 24px
+      );
+  }
+
+  .nova-site-integration-summary {
+    grid-template-columns:
+      1fr;
+  }
+}
+
+@media (
+  max-width: 480px
+) {
+  .nova-site-integration-modal__header,
+  .nova-site-integration-modal__body,
+  .nova-site-integration-modal__footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .nova-site-integration-modal__footer {
+    flex-direction: column-reverse;
+  }
+
+  .nova-site-integration-modal__cancel,
+  .nova-site-integration-modal__copy {
+    width: 100%;
+  }
+}

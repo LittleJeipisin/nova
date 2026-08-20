@@ -8,6 +8,7 @@ import { RealtimeGateway } from './realtime.gateway';
 export class RealtimeService {
   constructor(
     private readonly realtimeGateway: RealtimeGateway,
+
     private readonly prisma: PrismaService,
   ) {}
 
@@ -15,7 +16,7 @@ export class RealtimeService {
     /*
      * conversation:{conversationId}
      *
-     * Esta room sigue reservada para el Visitor.
+     * Room exclusiva del Visitor.
      */
     this.realtimeGateway.emitToConversation(
       conversationId,
@@ -24,8 +25,8 @@ export class RealtimeService {
     );
 
     /*
-     * Los usuarios internos reciben el mensaje
-     * según la audiencia real de la conversación:
+     * Los usuarios internos reciben el
+     * mensaje según la audiencia real:
      *
      * asignada:
      *   user:{agentId}
@@ -36,10 +37,28 @@ export class RealtimeService {
     void this.emitNewMessageToInternalAudience(conversationId, message).catch(
       () => {
         /*
-         * REST sigue siendo la fuente autoritativa.
-         * Un reconnect/refetch recuperará el estado.
+         * REST sigue siendo la fuente
+         * autoritativa.
          */
       },
+    );
+  }
+
+  /*
+   * Notifica al Visitor cuando cambia
+   * el estado de SU conversación.
+   *
+   * Esto permite informar inmediatamente
+   * OPEN / PENDING / CLOSED.
+   */
+  emitConversationUpdatedToVisitor(
+    conversationId: string,
+    conversation: unknown,
+  ) {
+    this.realtimeGateway.emitToConversation(
+      conversationId,
+      'conversation:updated',
+      conversation,
     );
   }
 
@@ -59,8 +78,7 @@ export class RealtimeService {
     /*
      * ADMIN.
      *
-     * El ADMIN ya no está en la room general
-     * del Workspace. Está únicamente en:
+     * El ADMIN está en:
      *
      * site:{siteId}
      */
@@ -96,18 +114,11 @@ export class RealtimeService {
     _workspaceId: string,
     conversationId: string,
   ) {
-    /*
-     * Los callers antiguos solo entregan
-     * workspaceId + conversationId.
-     *
-     * Consultamos la conversación para obtener
-     * su siteId sin romper las firmas actuales.
-     */
     void this.emitConversationRemovedFromUnassignedSite(conversationId).catch(
       () => {
         /*
-         * Si realtime falla, REST sigue siendo
-         * la fuente autoritativa.
+         * Si realtime falla, REST sigue
+         * siendo la fuente autoritativa.
          */
       },
     );
@@ -164,7 +175,9 @@ export class RealtimeService {
 
       select: {
         workspaceId: true,
+
         siteId: true,
+
         assignedAgentId: true,
       },
     });

@@ -23,6 +23,7 @@ type AuthenticatedUser = {
   role: string;
   ownerType: string | null;
   workspaceId: string | null;
+  workspaceSlug: string | null;
   mustChangePassword: boolean;
 };
 

@@ -1249,7 +1249,7 @@ export function PlatformAdminPage({
                           </small>
 
                           <code>
-                            {`${window.location.origin}/?workspace=${selectedWorkspace.slug}`}
+                            {`${window.location.origin}/${selectedWorkspace.slug}`}
                           </code>
                         </div>
                       </div>

@@ -17,6 +17,10 @@ import type {
 } from './auth/auth';
 
 import {
+  getWorkspaceSlugFromPath,
+} from './lib/workspace-route';
+
+import {
   AdminPage,
 } from './pages/AdminPage';
 
@@ -35,6 +39,41 @@ import {
 import {
   PlatformAdminPage,
 } from './pages/PlatformAdminPage';
+
+function isUserAllowedOnCurrentRoute(
+  user: AuthUser,
+) {
+  const routeWorkspaceSlug =
+    getWorkspaceSlugFromPath();
+
+  if (
+    user.role ===
+    'PLATFORM_ADMIN'
+  ) {
+    return (
+      routeWorkspaceSlug ===
+      null
+    );
+  }
+
+  const userWorkspaceSlug =
+    user.workspaceSlug
+      ?.trim()
+      .toLowerCase() ??
+    null;
+
+  if (
+    !routeWorkspaceSlug ||
+    !userWorkspaceSlug
+  ) {
+    return false;
+  }
+
+  return (
+    routeWorkspaceSlug ===
+    userWorkspaceSlug
+  );
+}
 
 function App() {
   const [
@@ -87,6 +126,44 @@ function App() {
           if (
             cancelled
           ) {
+            return;
+          }
+
+          /*
+           * Evitamos mezclar la sesión
+           * de un Workspace con la URL
+           * de otro.
+           *
+           * Ejemplo:
+           * sesión alpha + /beta
+           * => cerramos la sesión.
+           */
+          if (
+            !isUserAllowedOnCurrentRoute(
+              authenticatedUser,
+            )
+          ) {
+            try {
+              await logout();
+            } catch (
+              error
+            ) {
+              console.error(
+                'No se pudo cerrar la sesión incompatible:',
+                error,
+              );
+            }
+
+            if (
+              cancelled
+            ) {
+              return;
+            }
+
+            setUser(
+              null,
+            );
+
             return;
           }
 

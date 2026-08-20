@@ -21,9 +21,18 @@ export type AuthUser = {
   userId: string;
   username: string;
   role: UserRole;
-  ownerType: OwnerType;
-  workspaceId: string | null;
-  mustChangePassword: boolean;
+
+  ownerType:
+    OwnerType | null;
+
+  workspaceId:
+    string | null;
+
+  workspaceSlug:
+    string | null;
+
+  mustChangePassword:
+    boolean;
 };
 
 type LoginResponse = {
