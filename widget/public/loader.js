@@ -117,7 +117,7 @@
 
   iframe.setAttribute(
     'allow',
-    'clipboard-write',
+    'microphone; clipboard-write',
   );
 
   iframe.setAttribute(

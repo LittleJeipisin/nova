@@ -1,4 +1,6 @@
-import { io } from 'socket.io-client';
+import {
+  io,
+} from 'socket.io-client';
 
 export const NOVA_API_URL =
   'http://localhost:3000';
@@ -28,46 +30,64 @@ export type NovaWidgetPosition =
   | 'RIGHT';
 
 export type NovaWidgetConfig = {
-  title: string;
-  subtitle: string;
-  welcomeMessage: string;
+  title:
+    string;
+
+  subtitle:
+    string;
+
+  welcomeMessage:
+    string;
+
   position:
     NovaWidgetPosition;
 
   site: {
-    id: string;
-    name: string;
-    slug: string;
+    id:
+      string;
+
+    name:
+      string;
+
+    slug:
+      string;
   };
 };
 
 export type NovaConversation = {
-  id: string;
+  id:
+    string;
 
   status:
     | 'OPEN'
     | 'PENDING'
     | 'CLOSED';
 
-  workspaceId: string;
+  workspaceId:
+    string;
 
   siteId:
     string | null;
 
-  visitorId: string;
+  visitorId:
+    string;
 
   assignedAgentId:
     string | null;
 
-  createdAt: string;
-  updatedAt: string;
+  createdAt:
+    string;
+
+  updatedAt:
+    string;
 
   closedAt:
     string | null;
 };
 
 export type NovaMessage = {
-  id: string;
+  id:
+    string;
 
   conversationId:
     string;
@@ -84,7 +104,8 @@ export type NovaMessage = {
 
   type:
     | 'TEXT'
-    | 'IMAGE';
+    | 'IMAGE'
+    | 'AUDIO';
 
   content:
     string | null;
@@ -97,13 +118,15 @@ export type NovaMessage = {
 };
 
 type CreateVisitorResponse = {
-  visitorId: string;
+  visitorId:
+    string;
 
   visitorToken:
     string;
 
   visitor: {
-    id: string;
+    id:
+      string;
 
     workspaceId:
       string;
@@ -393,13 +416,6 @@ async function getActiveConversation(
   );
 }
 
-/*
- * Restaura únicamente una conversación
- * que YA existe y YA tiene mensajes.
- *
- * No crea Visitor.
- * No crea Conversation.
- */
 async function restoreSession():
   Promise<NovaSession | null> {
   const visitorToken =
@@ -416,12 +432,6 @@ async function restoreSession():
       visitorToken,
     );
 
-  /*
-   * Si el visitorToken expiró o dejó
-   * de ser válido, lo olvidamos.
-   *
-   * Tampoco creamos Visitor nuevo aquí.
-   */
   if (
     response.status ===
     401
@@ -480,15 +490,6 @@ export function restoreNovaSession() {
   return restorePromise;
 }
 
-/*
- * Este flujo SÍ puede crear:
- *
- * Visitor
- * Conversation
- *
- * Solamente se usa cuando el
- * visitante realmente intenta enviar.
- */
 async function createSession():
   Promise<NovaSession> {
   let visitorToken =
@@ -555,15 +556,6 @@ export function getNovaSession() {
   return sessionPromise;
 }
 
-/*
- * Prepara el widget para iniciar
- * una nueva Conversation.
- *
- * NO borra el visitorToken.
- *
- * El mismo Visitor puede tener varias
- * conversaciones históricas.
- */
 export function resetNovaSessionCache() {
   sessionPromise =
     null;
@@ -720,6 +712,75 @@ export async function sendNovaImageMessage(
   ) as NovaMessage;
 }
 
+/*
+ * =========================================================
+ * AUDIO
+ * =========================================================
+ */
+
+export async function sendNovaAudioMessage(
+  visitorToken:
+    string,
+
+  conversationId:
+    string,
+
+  file:
+    File,
+
+  content?:
+    string,
+) {
+  const workspaceSlug =
+    getEncodedWorkspaceSlug();
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    'file',
+    file,
+  );
+
+  if (
+    content?.trim()
+  ) {
+    formData.append(
+      'content',
+      content.trim(),
+    );
+  }
+
+  const response =
+    await fetch(
+      `${NOVA_API_URL}/widget/${workspaceSlug}/conversations/${conversationId}/audios`,
+      {
+        method:
+          'POST',
+
+        headers: {
+          Authorization:
+            `Bearer ${visitorToken}`,
+        },
+
+        body:
+          formData,
+      },
+    );
+
+  if (
+    !response.ok
+  ) {
+    throw new Error(
+      `No se pudo enviar el audio (${response.status})`,
+    );
+  }
+
+  return (
+    await response.json()
+  ) as NovaMessage;
+}
+
 function getSocketErrorMessage(
   error:
     unknown,
@@ -822,14 +883,6 @@ export function connectNovaSocket(
     },
   );
 
-  /*
-   * El Visitor recibe cambios de
-   * estado de su Conversation.
-   *
-   * Cuando el agente cierre:
-   *
-   * status = CLOSED
-   */
   socket.on(
     'conversation:updated',
     (

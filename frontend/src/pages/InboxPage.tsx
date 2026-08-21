@@ -169,6 +169,15 @@ function getLastMessage(
       : '📷 Imagen';
   }
 
+  if (
+    message.type ===
+    'AUDIO'
+  ) {
+    return message.content
+      ? `🎤 ${message.content}`
+      : '🎤 Audio';
+  }
+
   return (
     message.content ??
     'Mensaje'
@@ -601,14 +610,6 @@ export function InboxPage({
             ...withoutCurrent,
           ]);
 
-        /*
-         * Ref + state se actualizan
-         * inmediatamente para evitar
-         * la carrera entre:
-         *
-         * conversation:updated
-         * conversation:removed
-         */
         conversationsRef.current =
           nextConversations;
 
@@ -1674,10 +1675,6 @@ export function InboxPage({
                 return;
               }
 
-              /*
-               * El propio AGENT
-               * tomó esta conversación.
-               */
               if (
                 claimingConversationIdRef
                   .current ===
@@ -1690,15 +1687,6 @@ export function InboxPage({
                 return;
               }
 
-              /*
-               * OWNER / ADMIN acaba
-               * de asignarla a este
-               * AGENT.
-               *
-               * Ignoramos solamente
-               * el remove de la room
-               * de sin asignar.
-               */
               if (
                 assignedConversationProtectionRef
                   .current ===
@@ -1737,14 +1725,6 @@ export function InboxPage({
                 });
               }
 
-              /*
-               * Otro remove sí es
-               * legítimo.
-               *
-               * Por ejemplo:
-               * ADMIN la reasignó
-               * a otro AGENT.
-               */
               removeConversation(
                 conversationId,
               );
@@ -2394,6 +2374,28 @@ export function InboxPage({
                                 src={`${NOVA_API_URL}${message.mediaUrl}`}
                                 alt="Imagen del chat"
                               />
+                            ) : null}
+
+                            {message.content ? (
+                              <div>
+                                {
+                                  message.content
+                                }
+                              </div>
+                            ) : null}
+                          </>
+                        ) : message.type ===
+                          'AUDIO' ? (
+                          <>
+                            {message.mediaUrl ? (
+                              <audio
+                                className="nova-inbox-message__audio"
+                                controls
+                                preload="metadata"
+                                src={`${NOVA_API_URL}${message.mediaUrl}`}
+                              >
+                                Tu navegador no permite reproducir audio.
+                              </audio>
                             ) : null}
 
                             {message.content ? (

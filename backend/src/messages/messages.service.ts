@@ -7,23 +7,30 @@ import {
 } from '@nestjs/common';
 
 import { randomUUID } from 'crypto';
+
 import { promises as fs } from 'fs';
+
 import { join } from 'path';
 
 import { PrismaService } from '../prisma/prisma.service';
+
 import { RealtimeService } from '../realtime/realtime.service';
+
 import { VisitorsService } from '../visitors/visitors.service';
 
 @Injectable()
 export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
+
     private readonly realtimeService: RealtimeService,
+
     private readonly visitorsService: VisitorsService,
   ) {}
 
   private async getVisitorContext(
     workspaceSlug: string,
+
     visitorToken: string | undefined,
   ) {
     const workspace = await this.prisma.workspace.findUnique({
@@ -52,7 +59,9 @@ export class MessagesService {
     const site = await this.prisma.site.findFirst({
       where: {
         id: visitor.siteId,
+
         workspaceId: workspace.id,
+
         status: 'ACTIVE',
       },
     });
@@ -70,12 +79,19 @@ export class MessagesService {
     };
   }
 
-  private async getAgentContext(workspaceId: string, userId: string) {
+  private async getAgentContext(
+    workspaceId: string,
+
+    userId: string,
+  ) {
     const agent = await this.prisma.user.findFirst({
       where: {
         id: userId,
+
         workspaceId,
+
         role: 'AGENT',
+
         status: 'ACTIVE',
       },
     });
@@ -91,7 +107,9 @@ export class MessagesService {
     const site = await this.prisma.site.findFirst({
       where: {
         id: agent.siteId,
+
         workspaceId,
+
         status: 'ACTIVE',
       },
     });
@@ -106,9 +124,81 @@ export class MessagesService {
     };
   }
 
+  /*
+   * Normaliza MIME porque MediaRecorder
+   * puede entregar:
+   *
+   * audio/webm
+   *
+   * o:
+   *
+   * audio/webm;codecs=opus
+   */
+  private getAudioExtension(file: Express.Multer.File) {
+    const mimeType = file.mimetype.split(';')[0].trim().toLowerCase();
+
+    const allowedTypes: Record<string, string> = {
+      'audio/mpeg': '.mp3',
+
+      'audio/mp3': '.mp3',
+
+      'audio/wav': '.wav',
+
+      'audio/x-wav': '.wav',
+
+      'audio/ogg': '.ogg',
+
+      'audio/webm': '.webm',
+
+      'audio/mp4': '.m4a',
+
+      'audio/x-m4a': '.m4a',
+
+      'audio/aac': '.aac',
+
+      'audio/flac': '.flac',
+
+      'audio/x-flac': '.flac',
+    };
+
+    const extension = allowedTypes[mimeType];
+
+    if (!extension) {
+      throw new BadRequestException('Tipo de audio no permitido');
+    }
+
+    return extension;
+  }
+
+  private async saveMediaFile(
+    file: Express.Multer.File,
+
+    extension: string,
+  ) {
+    const filename = `${randomUUID()}${extension}`;
+
+    const uploadDirectory = join(process.cwd(), 'uploads', 'messages');
+
+    await fs.mkdir(uploadDirectory, {
+      recursive: true,
+    });
+
+    const filePath = join(uploadDirectory, filename);
+
+    await fs.writeFile(filePath, file.buffer);
+
+    return {
+      filePath,
+
+      mediaUrl: `/uploads/messages/${filename}`,
+    };
+  }
+
   async getVisitorMessages(
     workspaceSlug: string,
+
     conversationId: string,
+
     visitorToken: string | undefined,
   ) {
     const { workspace, visitor, site } = await this.getVisitorContext(
@@ -119,8 +209,11 @@ export class MessagesService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId: workspace.id,
+
         siteId: site.id,
+
         visitorId: visitor.id,
       },
     });
@@ -152,8 +245,11 @@ export class MessagesService {
 
   async createVisitorMessage(
     workspaceSlug: string,
+
     conversationId: string,
+
     visitorToken: string | undefined,
+
     content: string,
   ) {
     const cleanContent = content?.trim();
@@ -170,8 +266,11 @@ export class MessagesService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId: workspace.id,
+
         siteId: site.id,
+
         visitorId: visitor.id,
       },
     });
@@ -198,20 +297,17 @@ export class MessagesService {
       },
     });
 
+    /*
+     * PENDING permanece PENDING.
+     */
     await this.prisma.conversation.update({
       where: {
         id: conversation.id,
       },
 
-      data:
-        conversation.status === 'PENDING'
-          ? {
-              status: 'OPEN',
-              updatedAt: new Date(),
-            }
-          : {
-              updatedAt: new Date(),
-            },
+      data: {
+        updatedAt: new Date(),
+      },
     });
 
     await this.prisma.visitor.update({
@@ -233,8 +329,11 @@ export class MessagesService {
 
   async createAgentMessage(
     workspaceId: string,
+
     conversationId: string,
+
     userId: string,
+
     content: string,
   ) {
     const cleanContent = content?.trim();
@@ -248,7 +347,9 @@ export class MessagesService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: site.id,
       },
     });
@@ -300,9 +401,13 @@ export class MessagesService {
 
   async createVisitorImageMessage(
     workspaceSlug: string,
+
     conversationId: string,
+
     visitorToken: string | undefined,
+
     file: Express.Multer.File,
+
     content?: string,
   ) {
     if (!file) {
@@ -311,8 +416,11 @@ export class MessagesService {
 
     const allowedTypes: Record<string, string> = {
       'image/jpeg': '.jpg',
+
       'image/png': '.png',
+
       'image/webp': '.webp',
+
       'image/gif': '.gif',
     };
 
@@ -330,8 +438,11 @@ export class MessagesService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId: workspace.id,
+
         siteId: site.id,
+
         visitorId: visitor.id,
       },
     });
@@ -344,19 +455,7 @@ export class MessagesService {
       throw new BadRequestException('La conversación está cerrada');
     }
 
-    const filename = `${randomUUID()}${extension}`;
-
-    const uploadDirectory = join(process.cwd(), 'uploads', 'messages');
-
-    await fs.mkdir(uploadDirectory, {
-      recursive: true,
-    });
-
-    const filePath = join(uploadDirectory, filename);
-
-    await fs.writeFile(filePath, file.buffer);
-
-    const mediaUrl = `/uploads/messages/${filename}`;
+    const { filePath, mediaUrl } = await this.saveMediaFile(file, extension);
 
     const cleanContent = content?.trim() || null;
 
@@ -377,20 +476,18 @@ export class MessagesService {
         },
       });
 
+      /*
+       * Una imagen tampoco cambia
+       * PENDING -> OPEN.
+       */
       await this.prisma.conversation.update({
         where: {
           id: conversation.id,
         },
 
-        data:
-          conversation.status === 'PENDING'
-            ? {
-                status: 'OPEN',
-                updatedAt: new Date(),
-              }
-            : {
-                updatedAt: new Date(),
-              },
+        data: {
+          updatedAt: new Date(),
+        },
       });
 
       await this.prisma.visitor.update({
@@ -417,9 +514,13 @@ export class MessagesService {
 
   async createAgentImageMessage(
     workspaceId: string,
+
     conversationId: string,
+
     userId: string,
+
     file: Express.Multer.File,
+
     content?: string,
   ) {
     if (!file) {
@@ -428,8 +529,11 @@ export class MessagesService {
 
     const allowedTypes: Record<string, string> = {
       'image/jpeg': '.jpg',
+
       'image/png': '.png',
+
       'image/webp': '.webp',
+
       'image/gif': '.gif',
     };
 
@@ -444,7 +548,9 @@ export class MessagesService {
     const conversation = await this.prisma.conversation.findFirst({
       where: {
         id: conversationId,
+
         workspaceId,
+
         siteId: site.id,
       },
     });
@@ -463,19 +569,7 @@ export class MessagesService {
       );
     }
 
-    const filename = `${randomUUID()}${extension}`;
-
-    const uploadDirectory = join(process.cwd(), 'uploads', 'messages');
-
-    await fs.mkdir(uploadDirectory, {
-      recursive: true,
-    });
-
-    const filePath = join(uploadDirectory, filename);
-
-    await fs.writeFile(filePath, file.buffer);
-
-    const mediaUrl = `/uploads/messages/${filename}`;
+    const { filePath, mediaUrl } = await this.saveMediaFile(file, extension);
 
     const cleanContent = content?.trim() || null;
 
@@ -518,6 +612,205 @@ export class MessagesService {
     }
   }
 
+  /*
+   * =======================================================
+   * VISITOR AUDIO
+   * =======================================================
+   */
+
+  async createVisitorAudioMessage(
+    workspaceSlug: string,
+
+    conversationId: string,
+
+    visitorToken: string | undefined,
+
+    file: Express.Multer.File,
+
+    content?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un audio');
+    }
+
+    const extension = this.getAudioExtension(file);
+
+    const { workspace, visitor, site } = await this.getVisitorContext(
+      workspaceSlug,
+      visitorToken,
+    );
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+
+        workspaceId: workspace.id,
+
+        siteId: site.id,
+
+        visitorId: visitor.id,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversación no encontrada');
+    }
+
+    if (conversation.status === 'CLOSED') {
+      throw new BadRequestException('La conversación está cerrada');
+    }
+
+    const { filePath, mediaUrl } = await this.saveMediaFile(file, extension);
+
+    const cleanContent = content?.trim() || null;
+
+    try {
+      const message = await this.prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+
+          senderType: 'VISITOR',
+
+          senderVisitorId: visitor.id,
+
+          type: 'AUDIO',
+
+          content: cleanContent,
+
+          mediaUrl,
+        },
+      });
+
+      /*
+       * IMPORTANTE:
+       *
+       * Audio enviado mientras está
+       * PENDING mantiene PENDING.
+       */
+      await this.prisma.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      await this.prisma.visitor.update({
+        where: {
+          id: visitor.id,
+        },
+
+        data: {
+          lastSeenAt: new Date(),
+        },
+      });
+
+      this.realtimeService.emitNewMessage(conversation.id, message);
+
+      await this.emitConversationUpdated(conversation.id);
+
+      return message;
+    } catch (error) {
+      await fs.unlink(filePath).catch(() => {});
+
+      throw error;
+    }
+  }
+
+  /*
+   * =======================================================
+   * AGENT AUDIO
+   * =======================================================
+   */
+
+  async createAgentAudioMessage(
+    workspaceId: string,
+
+    conversationId: string,
+
+    userId: string,
+
+    file: Express.Multer.File,
+
+    content?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Debes adjuntar un audio');
+    }
+
+    const extension = this.getAudioExtension(file);
+
+    const { agent, site } = await this.getAgentContext(workspaceId, userId);
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: {
+        id: conversationId,
+
+        workspaceId,
+
+        siteId: site.id,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversación no encontrada');
+    }
+
+    if (conversation.status === 'CLOSED') {
+      throw new BadRequestException('La conversación está cerrada');
+    }
+
+    if (conversation.assignedAgentId !== agent.id) {
+      throw new UnauthorizedException(
+        'La conversación está asignada a otro agente',
+      );
+    }
+
+    const { filePath, mediaUrl } = await this.saveMediaFile(file, extension);
+
+    const cleanContent = content?.trim() || null;
+
+    try {
+      const message = await this.prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+
+          senderType: 'USER',
+
+          senderUserId: agent.id,
+
+          type: 'AUDIO',
+
+          content: cleanContent,
+
+          mediaUrl,
+        },
+      });
+
+      await this.prisma.conversation.update({
+        where: {
+          id: conversation.id,
+        },
+
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+
+      this.realtimeService.emitNewMessage(conversation.id, message);
+
+      await this.emitConversationUpdated(conversation.id);
+
+      return message;
+    } catch (error) {
+      await fs.unlink(filePath).catch(() => {});
+
+      throw error;
+    }
+  }
+
   private async emitConversationUpdated(conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
       where: {
@@ -530,9 +823,13 @@ export class MessagesService {
         assignedAgent: {
           select: {
             id: true,
+
             username: true,
+
             role: true,
+
             status: true,
+
             siteId: true,
           },
         },
@@ -552,10 +849,18 @@ export class MessagesService {
     }
 
     /*
-     * RealtimeService ahora divide:
+     * VISITOR:
      *
-     * OWNER / PLATFORM_ADMIN -> Workspace
-     * ADMIN                  -> Site
+     * OPEN / PENDING / CLOSED
+     * en realtime.
+     */
+    this.realtimeService.emitConversationUpdatedToVisitor(
+      conversation.id,
+      conversation,
+    );
+
+    /*
+     * OWNER / ADMIN.
      */
     this.realtimeService.emitConversationUpdatedToWorkspace(
       conversation.workspaceId,
@@ -563,10 +868,7 @@ export class MessagesService {
     );
 
     /*
-     * AGENT:
-     *
-     * asignada -> room privada
-     * sin asignar -> room unassigned del Site
+     * AGENT.
      */
     if (conversation.assignedAgentId) {
       this.realtimeService.emitConversationUpdatedToUser(

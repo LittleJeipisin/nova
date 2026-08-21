@@ -20,6 +20,7 @@ import {
   NOVA_API_URL,
   resetNovaSessionCache,
   restoreNovaSession,
+  sendNovaAudioMessage,
   sendNovaImageMessage,
   sendNovaTextMessage,
 } from './nova';
@@ -71,6 +72,101 @@ function sortMessages(
         b.createdAt,
       ).getTime(),
   );
+}
+
+function formatRecordingTime(
+  seconds:
+    number,
+) {
+  const minutes =
+    Math.floor(
+      seconds /
+        60,
+    );
+
+  const remainingSeconds =
+    seconds %
+    60;
+
+  return `${minutes
+    .toString()
+    .padStart(
+      2,
+      '0',
+    )}:${remainingSeconds
+    .toString()
+    .padStart(
+      2,
+      '0',
+    )}`;
+}
+
+function getPreferredAudioMimeType() {
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/ogg;codecs=opus',
+  ];
+
+  for (
+    const type
+    of types
+  ) {
+    if (
+      MediaRecorder.isTypeSupported(
+        type,
+      )
+    ) {
+      return type;
+    }
+  }
+
+  return '';
+}
+
+function getAudioExtension(
+  mimeType:
+    string,
+) {
+  const cleanMime =
+    mimeType
+      .split(';')[0]
+      .toLowerCase();
+
+  if (
+    cleanMime ===
+    'audio/mp4'
+  ) {
+    return 'm4a';
+  }
+
+  if (
+    cleanMime ===
+    'audio/ogg'
+  ) {
+    return 'ogg';
+  }
+
+  if (
+    cleanMime ===
+      'audio/mpeg' ||
+    cleanMime ===
+      'audio/mp3'
+  ) {
+    return 'mp3';
+  }
+
+  if (
+    cleanMime ===
+      'audio/wav' ||
+    cleanMime ===
+      'audio/x-wav'
+  ) {
+    return 'wav';
+  }
+
+  return 'webm';
 }
 
 function App() {
@@ -171,6 +267,22 @@ function App() {
     );
 
   const [
+    recording,
+    setRecording,
+  ] =
+    useState(
+      false,
+    );
+
+  const [
+    recordingSeconds,
+    setRecordingSeconds,
+  ] =
+    useState(
+      0,
+    );
+
+  const [
     error,
     setError,
   ] =
@@ -208,13 +320,38 @@ function App() {
       false,
     );
 
-  /*
-   * Evita que nuestro disconnect()
-   * intencional al cerrar la conversación
-   * cambie "Finalizada" por
-   * "Desconectado".
-   */
   const conversationClosedRef =
+    useRef(
+      false,
+    );
+
+  const mediaRecorderRef =
+    useRef<
+      MediaRecorder | null
+    >(
+      null,
+    );
+
+  const mediaStreamRef =
+    useRef<
+      MediaStream | null
+    >(
+      null,
+    );
+
+  const audioChunksRef =
+    useRef<
+      Blob[]
+    >([]);
+
+  const recordingTimerRef =
+    useRef<
+      number | null
+    >(
+      null,
+    );
+
+  const cancelRecordingRef =
     useRef(
       false,
     );
@@ -301,10 +438,63 @@ function App() {
       [],
     );
 
-  /*
-   * Conectamos Socket solamente
-   * cuando existe una Conversation.
-   */
+  function clearRecordingTimer() {
+    if (
+      recordingTimerRef.current ===
+      null
+    ) {
+      return;
+    }
+
+    window.clearInterval(
+      recordingTimerRef.current,
+    );
+
+    recordingTimerRef.current =
+      null;
+  }
+
+  function stopMediaStream() {
+    const stream =
+      mediaStreamRef.current;
+
+    if (
+      !stream
+    ) {
+      return;
+    }
+
+    for (
+      const track
+      of stream.getTracks()
+    ) {
+      track.stop();
+    }
+
+    mediaStreamRef.current =
+      null;
+  }
+
+  function cleanupRecording() {
+    clearRecordingTimer();
+
+    stopMediaStream();
+
+    mediaRecorderRef.current =
+      null;
+
+    audioChunksRef.current =
+      [];
+
+    setRecording(
+      false,
+    );
+
+    setRecordingSeconds(
+      0,
+    );
+  }
+
   const connectSessionSocket =
     useCallback(
       (
@@ -323,7 +513,9 @@ function App() {
         socketRef.current =
           connectNovaSocket(
             novaSession.visitorToken,
-            novaSession.conversation.id,
+            novaSession
+              .conversation
+              .id,
             {
               async onJoined() {
                 conversationClosedRef.current =
@@ -410,12 +602,22 @@ function App() {
                   return;
                 }
 
-                /*
-                 * El agente cerró la
-                 * Conversation.
-                 */
                 conversationClosedRef.current =
                   true;
+
+                const recorder =
+                  mediaRecorderRef.current;
+
+                if (
+                  recorder &&
+                  recorder.state !==
+                    'inactive'
+                ) {
+                  cancelRecordingRef.current =
+                    true;
+
+                  recorder.stop();
+                }
 
                 setConnectionStatus(
                   'Finalizada',
@@ -448,11 +650,6 @@ function App() {
                     '';
                 }
 
-                /*
-                 * Ya no necesitamos mantener
-                 * Socket abierto para una
-                 * conversación cerrada.
-                 */
                 socketRef.current
                   ?.disconnect();
 
@@ -461,12 +658,6 @@ function App() {
               },
 
               onDisconnect() {
-                /*
-                 * Si nosotros desconectamos
-                 * porque CLOSED, conservamos:
-                 *
-                 * Finalizada
-                 */
                 if (
                   conversationClosedRef.current
                 ) {
@@ -494,13 +685,6 @@ function App() {
       ],
     );
 
-  /*
-   * Al cargar solamente obtenemos
-   * configuración pública.
-   *
-   * Aquí NO se crea Visitor.
-   * Aquí NO se crea Conversation.
-   */
   useEffect(
     () => {
       let cancelled =
@@ -557,9 +741,6 @@ function App() {
     [],
   );
 
-  /*
-   * Desconecta Socket al desmontar.
-   */
   useEffect(
     () => {
       return () => {
@@ -568,14 +749,15 @@ function App() {
 
         socketRef.current =
           null;
+
+        clearRecordingTimer();
+
+        stopMediaStream();
       };
     },
     [],
   );
 
-  /*
-   * Scroll automático.
-   */
   useEffect(
     () => {
       if (
@@ -597,9 +779,6 @@ function App() {
     ],
   );
 
-  /*
-   * Libera preview de imágenes.
-   */
   useEffect(
     () => {
       if (
@@ -619,15 +798,6 @@ function App() {
     ],
   );
 
-  /*
-   * Comunicación con loader.js.
-   *
-   * Si estamos dentro de iframe,
-   * notificamos cada cambio:
-   *
-   * abierto / cerrado
-   * LEFT / RIGHT
-   */
   useEffect(
     () => {
       if (
@@ -666,15 +836,6 @@ function App() {
     ],
   );
 
-  /*
-   * Al abrir:
-   *
-   * Si nunca habló:
-   * NO se crea nada.
-   *
-   * Si ya existe sesión:
-   * restauramos historial + Socket.
-   */
   async function initializeNovaSession() {
     if (
       session ||
@@ -778,17 +939,21 @@ function App() {
     }
   }
 
-  /*
-   * El usuario decide iniciar otro
-   * contacto después del cierre.
-   *
-   * Conservamos Visitor.
-   * Olvidamos solamente Conversation.
-   *
-   * No creamos otra Conversation hasta
-   * que envíe el primer mensaje.
-   */
   function handleStartNewConversation() {
+    const recorder =
+      mediaRecorderRef.current;
+
+    if (
+      recorder &&
+      recorder.state !==
+        'inactive'
+    ) {
+      cancelRecordingRef.current =
+        true;
+
+      recorder.stop();
+    }
+
     socketRef.current
       ?.disconnect();
 
@@ -924,18 +1089,365 @@ function App() {
     );
   }
 
+  async function sendRecordedAudio(
+    blob:
+      Blob,
+  ) {
+    if (
+      blob.size ===
+      0
+    ) {
+      setError(
+        'No se pudo generar el audio.',
+      );
+
+      return;
+    }
+
+    try {
+      setSending(
+        true,
+      );
+
+      setError(
+        null,
+      );
+
+      let activeSession =
+        session;
+
+      if (
+        !activeSession
+      ) {
+        setConnectionStatus(
+          'Conectando...',
+        );
+
+        activeSession =
+          await getNovaSession();
+
+        conversationClosedRef.current =
+          false;
+
+        setSession(
+          activeSession,
+        );
+
+        connectSessionSocket(
+          activeSession,
+        );
+      }
+
+      if (
+        activeSession
+          .conversation
+          .status ===
+        'CLOSED'
+      ) {
+        return;
+      }
+
+      const mimeType =
+        blob.type ||
+        'audio/webm';
+
+      const extension =
+        getAudioExtension(
+          mimeType,
+        );
+
+      const file =
+        new File(
+          [
+            blob,
+          ],
+          `audio-${Date.now()}.${extension}`,
+          {
+            type:
+              mimeType,
+          },
+        );
+
+      const message =
+        await sendNovaAudioMessage(
+          activeSession.visitorToken,
+          activeSession
+            .conversation
+            .id,
+          file,
+        );
+
+      addMessage(
+        message,
+      );
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
+
+      setError(
+        err instanceof
+          Error
+          ? err.message
+          : 'No se pudo enviar el audio',
+      );
+    } finally {
+      setSending(
+        false,
+      );
+    }
+  }
+
+  async function handleStartRecording() {
+    if (
+      recording ||
+      sending ||
+      initializingSession
+    ) {
+      return;
+    }
+
+    if (
+      session
+        ?.conversation
+        .status ===
+      'CLOSED'
+    ) {
+      return;
+    }
+
+    if (
+      selectedImage
+    ) {
+      setError(
+        'Quita la imagen seleccionada antes de grabar un audio.',
+      );
+
+      return;
+    }
+
+    if (
+      typeof MediaRecorder ===
+        'undefined' ||
+      !navigator.mediaDevices
+        ?.getUserMedia
+    ) {
+      setError(
+        'Tu navegador no permite grabar audio desde este chat.',
+      );
+
+      return;
+    }
+
+    try {
+      setError(
+        null,
+      );
+
+      const stream =
+        await navigator.mediaDevices
+          .getUserMedia({
+            audio:
+              true,
+          });
+
+      mediaStreamRef.current =
+        stream;
+
+      const preferredMimeType =
+        getPreferredAudioMimeType();
+
+      const recorder =
+        preferredMimeType
+          ? new MediaRecorder(
+              stream,
+              {
+                mimeType:
+                  preferredMimeType,
+              },
+            )
+          : new MediaRecorder(
+              stream,
+            );
+
+      mediaRecorderRef.current =
+        recorder;
+
+      audioChunksRef.current =
+        [];
+
+      cancelRecordingRef.current =
+        false;
+
+      recorder.ondataavailable =
+        (
+          event,
+        ) => {
+          if (
+            event.data.size >
+            0
+          ) {
+            audioChunksRef.current.push(
+              event.data,
+            );
+          }
+        };
+
+      recorder.onerror =
+        () => {
+          setError(
+            'Ocurrió un error mientras se grababa el audio.',
+          );
+        };
+
+      recorder.onstop =
+        () => {
+          const cancelled =
+            cancelRecordingRef.current;
+
+          const chunks = [
+            ...audioChunksRef.current,
+          ];
+
+          const mimeType =
+            recorder.mimeType ||
+            preferredMimeType ||
+            'audio/webm';
+
+          cleanupRecording();
+
+          cancelRecordingRef.current =
+            false;
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          const blob =
+            new Blob(
+              chunks,
+              {
+                type:
+                  mimeType,
+              },
+            );
+
+          void sendRecordedAudio(
+            blob,
+          );
+        };
+
+      recorder.start(
+        250,
+      );
+
+      setRecording(
+        true,
+      );
+
+      setRecordingSeconds(
+        0,
+      );
+
+      recordingTimerRef.current =
+        window.setInterval(
+          () => {
+            setRecordingSeconds(
+              (
+                current,
+              ) =>
+                current +
+                1,
+            );
+          },
+          1000,
+        );
+    } catch (
+      err
+    ) {
+      console.error(
+        err,
+      );
+
+      cleanupRecording();
+
+      if (
+        err instanceof
+          DOMException &&
+        (
+          err.name ===
+            'NotAllowedError' ||
+          err.name ===
+            'PermissionDeniedError'
+        )
+      ) {
+        setError(
+          'Debes permitir el acceso al micrófono para enviar audios.',
+        );
+
+        return;
+      }
+
+      setError(
+        'No se pudo acceder al micrófono.',
+      );
+    }
+  }
+
+  function handleStopRecording() {
+    const recorder =
+      mediaRecorderRef.current;
+
+    if (
+      !recorder ||
+      recorder.state ===
+        'inactive'
+    ) {
+      return;
+    }
+
+    cancelRecordingRef.current =
+      false;
+
+    recorder.stop();
+  }
+
+  function handleCancelRecording() {
+    const recorder =
+      mediaRecorderRef.current;
+
+    if (
+      !recorder ||
+      recorder.state ===
+        'inactive'
+    ) {
+      cleanupRecording();
+
+      return;
+    }
+
+    cancelRecordingRef.current =
+      true;
+
+    recorder.stop();
+  }
+
   async function handleSubmit(
     event:
       SyntheticEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    /*
-     * Segunda protección frontend.
-     *
-     * El backend además continúa
-     * bloqueando CLOSED.
-     */
+    if (
+      recording
+    ) {
+      return;
+    }
+
     if (
       session
         ?.conversation
@@ -971,12 +1483,6 @@ function App() {
         null,
       );
 
-      /*
-       * PRIMER ENVÍO REAL:
-       *
-       * recién aquí se crea
-       * Visitor + Conversation.
-       */
       let activeSession =
         session;
 
@@ -1077,6 +1583,12 @@ function App() {
       .status ===
     'CLOSED';
 
+  const conversationPending =
+    session
+      ?.conversation
+      .status ===
+    'PENDING';
+
   const positionClass =
     config.position ===
     'LEFT'
@@ -1086,15 +1598,24 @@ function App() {
   const statusClass =
     conversationClosed
       ? 'nova-chat__status nova-chat__status--closed'
-      : connectionStatus ===
-          'En línea'
-        ? 'nova-chat__status nova-chat__status--online'
+      : conversationPending
+        ? 'nova-chat__status nova-chat__status--pending'
         : connectionStatus ===
-              'Desconectado' ||
-            connectionStatus ===
-              'Error'
-          ? 'nova-chat__status nova-chat__status--offline'
-          : 'nova-chat__status';
+            'En línea'
+          ? 'nova-chat__status nova-chat__status--online'
+          : connectionStatus ===
+                'Desconectado' ||
+              connectionStatus ===
+                'Error'
+            ? 'nova-chat__status nova-chat__status--offline'
+            : 'nova-chat__status';
+
+  const visibleStatus =
+    conversationClosed
+      ? 'Finalizada'
+      : conversationPending
+        ? 'En espera'
+        : connectionStatus;
 
   const brandInitial =
     config.title
@@ -1144,9 +1665,7 @@ function App() {
                 <span className="nova-chat__status-dot" />
 
                 {
-                  conversationClosed
-                    ? 'Finalizada'
-                    : connectionStatus
+                  visibleStatus
                 }
               </span>
 
@@ -1236,6 +1755,28 @@ function App() {
                         </div>
                       ) : null}
                     </>
+                  ) : message.type ===
+                    'AUDIO' ? (
+                    <>
+                      {message.mediaUrl ? (
+                        <audio
+                          className="nova-message__audio"
+                          controls
+                          preload="metadata"
+                          src={`${NOVA_API_URL}${message.mediaUrl}`}
+                        >
+                          Tu navegador no permite reproducir audio.
+                        </audio>
+                      ) : null}
+
+                      {message.content ? (
+                        <div className="nova-message__content">
+                          {
+                            message.content
+                          }
+                        </div>
+                      ) : null}
+                    </>
                   ) : (
                     <div className="nova-message__content">
                       {
@@ -1252,6 +1793,48 @@ function App() {
                 </div>
               ),
             )}
+
+            {conversationPending ? (
+              <div
+                className="nova-chat__pending-notice"
+                role="status"
+              >
+                <div className="nova-chat__pending-notice-icon">
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M12 7v5l3 2"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="8"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                  </svg>
+                </div>
+
+                <div className="nova-chat__pending-notice-content">
+                  <strong>
+                    Conversación en espera
+                  </strong>
+
+                  <span>
+                    El equipo de soporte retomará tu atención pronto. Puedes seguir enviando mensajes.
+                  </span>
+                </div>
+              </div>
+            ) : null}
 
             {conversationClosed ? (
               <div
@@ -1340,6 +1923,44 @@ function App() {
                 <strong>
                   Nova
                 </strong>
+              </div>
+            </div>
+          ) : recording ? (
+            <div className="nova-chat__recording-area">
+              <div className="nova-chat__recording">
+                <span className="nova-chat__recording-dot" />
+
+                <strong>
+                  Grabando
+                </strong>
+
+                <span>
+                  {formatRecordingTime(
+                    recordingSeconds,
+                  )}
+                </span>
+              </div>
+
+              <div className="nova-chat__recording-actions">
+                <button
+                  type="button"
+                  className="nova-chat__recording-cancel"
+                  onClick={
+                    handleCancelRecording
+                  }
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  className="nova-chat__recording-send"
+                  onClick={
+                    handleStopRecording
+                  }
+                >
+                  Enviar audio
+                </button>
               </div>
             </div>
           ) : (
@@ -1454,6 +2075,44 @@ function App() {
                       aria-label="Mensaje"
                     />
                   </div>
+
+                  <button
+                    type="button"
+                    className="nova-chat__microphone"
+                    disabled={
+                      sending ||
+                      initializingSession
+                    }
+                    onClick={() => {
+                      void handleStartRecording();
+                    }}
+                    aria-label="Grabar audio"
+                    title="Grabar audio"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <rect
+                        x="9"
+                        y="3"
+                        width="6"
+                        height="11"
+                        rx="3"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
+
+                      <path
+                        d="M6.5 11a5.5 5.5 0 0011 0M12 16.5V21M9 21h6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
 
                   <button
                     type="submit"

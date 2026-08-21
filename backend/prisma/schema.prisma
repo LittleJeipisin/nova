@@ -41,6 +41,7 @@ enum ConversationStatus {
 enum MessageType {
   TEXT
   IMAGE
+  AUDIO
 }
 
 enum MessageSenderType {
@@ -76,7 +77,7 @@ model Site {
   name   String
   slug   String
   domain String?
-  status String  @default("ACTIVE")
+  status String @default("ACTIVE")
 
   users         User[]
   visitors      Visitor[]
@@ -148,7 +149,7 @@ model Visitor {
   site   Site?   @relation(fields: [siteId], references: [id], onDelete: SetNull)
 
   conversations Conversation[]
-  sentMessages  Message[]      @relation("VisitorMessages")
+  sentMessages  Message[] @relation("VisitorMessages")
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -178,8 +179,8 @@ model Conversation {
 
   messages Message[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   closedAt  DateTime?
 
   @@index([workspaceId])

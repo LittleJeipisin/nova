@@ -17,14 +17,19 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { MessagesService } from './messages.service';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
 import { PasswordChangedGuard } from '../auth/guards/password.guards';
+
 import { RolesGuard } from '../auth/guards/roles.guards';
+
 import { WorkspaceGuard } from '../auth/guards/workspace.guards';
+
 import { Roles } from '../auth/decorators/roles.decorators';
 
 type AuthenticatedRequest = Request & {
   user: {
     userId: string;
+
     role: string;
   };
 };
@@ -93,6 +98,47 @@ export class WorkspaceMessagesController {
     file: Express.Multer.File,
   ) {
     return this.messagesService.createAgentImageMessage(
+      workspaceId,
+      conversationId,
+      request.user.userId,
+      file,
+      content,
+    );
+  }
+
+  @Post(':workspaceId/conversations/:conversationId/audios')
+  @UseGuards(JwtAuthGuard, PasswordChangedGuard, RolesGuard, WorkspaceGuard)
+  @Roles('AGENT')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+    }),
+  )
+  async createAgentAudioMessage(
+    @Param('workspaceId')
+    workspaceId: string,
+
+    @Param('conversationId')
+    conversationId: string,
+
+    @Body('content')
+    content: string | undefined,
+
+    @Req()
+    request: AuthenticatedRequest,
+
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addMaxSizeValidator({
+          maxSize: 15 * 1024 * 1024,
+        })
+        .build(),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.messagesService.createAgentAudioMessage(
       workspaceId,
       conversationId,
       request.user.userId,

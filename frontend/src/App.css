@@ -5086,3 +5086,167 @@ div {
       23px !important;
   }
 }
+
+/*
+ * =========================================================
+ * LOGIN PASSWORD VISIBILITY
+ * =========================================================
+ */
+
+.nova-login__password-field {
+  width: 100%;
+
+  position: relative;
+}
+
+.nova-login__password-field
+input {
+  padding-right:
+    48px !important;
+}
+
+.nova-login__form
+.nova-login__password-toggle {
+  width:
+    36px !important;
+
+  min-width:
+    36px !important;
+
+  height:
+    36px !important;
+
+  min-height:
+    36px !important;
+
+  position: absolute !important;
+
+  top: 50% !important;
+  right: 5px !important;
+
+  transform:
+    translateY(-50%) !important;
+
+  display:
+    inline-flex !important;
+
+  align-items:
+    center !important;
+
+  justify-content:
+    center !important;
+
+  padding:
+    0 !important;
+
+  margin:
+    0 !important;
+
+  border:
+    0 !important;
+
+  border-radius:
+    8px !important;
+
+  background:
+    transparent !important;
+
+  color:
+    #64748b !important;
+
+  box-shadow:
+    none !important;
+
+  cursor:
+    pointer;
+}
+
+.nova-login__form
+.nova-login__password-toggle
+svg {
+  width: 19px;
+  height: 19px;
+
+  display: block;
+}
+
+.nova-login__form
+.nova-login__password-toggle:hover:not(:disabled) {
+  border:
+    0 !important;
+
+  background:
+    #f1f5f9 !important;
+
+  color:
+    #2563eb !important;
+
+  box-shadow:
+    none !important;
+
+  transform:
+    translateY(-50%) !important;
+}
+
+.nova-login__form
+.nova-login__password-toggle:active:not(:disabled) {
+  transform:
+    translateY(-50%) !important;
+}
+
+.nova-login__form
+.nova-login__password-toggle:focus-visible {
+  outline:
+    none;
+
+  box-shadow:
+    0 0 0 3px
+    rgba(
+      37,
+      99,
+      235,
+      0.12
+    ) !important;
+}
+
+.nova-login__form
+.nova-login__password-toggle:disabled {
+  opacity:
+    0.45 !important;
+
+  cursor:
+    not-allowed !important;
+
+  background:
+    transparent !important;
+}
+
+/*
+ * Oculta el botón nativo de mostrar contraseña
+ * de Microsoft Edge / navegadores Microsoft.
+ */
+.nova-login__password-field
+input::-ms-reveal,
+.nova-login__password-field
+input::-ms-clear {
+  display: none;
+}
+
+/*
+ * =========================================================
+ * INBOX AUDIO
+ * =========================================================
+ */
+
+.nova-inbox-message__audio {
+  display: block;
+
+  width: 280px;
+  max-width: 100%;
+
+  height: 40px;
+
+  margin: 2px 0;
+
+  border-radius: 10px;
+}

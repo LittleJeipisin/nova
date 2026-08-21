@@ -99,4 +99,56 @@ export class MessagesController {
       content,
     );
   }
+
+  /*
+   * AUDIO
+   *
+   * El MIME se valida nuevamente
+   * dentro de MessagesService.
+   *
+   * No usamos FileTypeValidator aquí
+   * porque MediaRecorder puede producir:
+   *
+   * audio/webm;codecs=opus
+   *
+   * dependiendo del navegador.
+   */
+  @Post(':workspaceSlug/conversations/:conversationId/audios')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+    }),
+  )
+  async createVisitorAudioMessage(
+    @Param('workspaceSlug')
+    workspaceSlug: string,
+
+    @Param('conversationId')
+    conversationId: string,
+
+    @Headers('authorization')
+    authorization: string | undefined,
+
+    @Body('content')
+    content: string | undefined,
+
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addMaxSizeValidator({
+          maxSize: 15 * 1024 * 1024,
+        })
+        .build(),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.messagesService.createVisitorAudioMessage(
+      workspaceSlug,
+      conversationId,
+      authorization,
+      file,
+      content,
+    );
+  }
 }
